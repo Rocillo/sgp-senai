@@ -1,0 +1,1126 @@
+
+<!-- Documento base compartilhado entre templates Flask/Jinja.
+     Centraliza cabeçalho global, navegação, widgets e áreas de extensão via blocks. -->
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] layout_base
+[RESPONSABILIDADE] Estrutura principal do layout base da aplicação Flask/Jinja
+==================================================================== -->
+<!DOCTYPE html>
+<html lang="pt-br">
+
+  <head>
+
+    <!-- Metadados essenciais do documento e ponto de extensão para o título da página -->
+    <meta charset="UTF-8" />
+    <title>{% block title %}Pneumark SGP{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Dependências visuais globais: ícones externos e folha principal do frontend -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+
+    <style>
+      /* Estilos locais deste layout.
+         Complementam o CSS global para elementos exclusivos da estrutura base. */
+      /* ====================================================================
+      [BLOCO] BLOCO_STYLE
+      [NOME] estilos_layout_base
+      [RESPONSABILIDADE] Agrupar estilos globais do layout base, widgets e responsividade
+      ==================================================================== */
+
+      /* Estrutura visual do topo principal, marca, navegação e áreas auxiliares. */
+      /* ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] appbar_layout_styles
+      [RESPONSABILIDADE] Estilos globais do topo, appbar, navegação e responsividade
+      ==================================================================== */
+      .topline{height:5px;background:linear-gradient(90deg,#e60000,#FF7A00,#00AEEF,#28a745,#e60000);background-size:300% 150%;animation:slide 7s linear infinite}
+      @keyframes slide{0%{background-position:0% 50%}100%{background-position:100% 50%}}
+      .appbar{background:#2a1b0f;color:#fff}
+      .appbar-inner{max-width:1200px;margin:0 auto;padding:10px 16px;display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center}
+      .brand{display:flex;gap:12px;align-items:center}
+      .brand-logo{width:160px;height:70px;border-radius:8px;object-fit:cover}
+      .brand h1{font-size:1.1rem;margin:0;line-height:1.1}
+      .brand small{opacity:.8}
+      nav.nav{display:flex;gap:12px;justify-content:center}
+      nav.nav a{color:#cfe4ff;text-decoration:none;padding:8px 12px;border-radius:999px;border:1px solid transparent}
+      
+      /* nav.nav a:hover{background:#392413;border-color:#234} */
+      
+      nav.nav a.active{background:#143055;border-color:#2c5a9a;color:#fff}
+      .widgets{display:flex;gap:14px;align-items:center}
+      .widget,.motd,.userchip{display:flex;gap:8px;align-items:center;padding:6px 10px;border-radius:10px;background:#0c1624;border:1px solid #1c2b45}
+      .widget .label{opacity:.8;font-size:.8rem}
+      .widget strong{font-variant-numeric:tabular-nums}
+      .motd{flex:1 1 420px;min-width:260px}
+      .motd i{opacity:.9;flex:0 0 auto}
+      .motd-quote{
+        font-style:italic;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        max-width:560px;
+        display:block;
+      }
+      .container{max-width:1200px;margin:16px auto;padding:0 16px}
+      .footer{text-align:center;color:#7c8aa5;padding:24px 0}
+      .fadeout{position:fixed;inset:0;pointer-events:none;background:#0f1b2a;opacity:0;transition:opacity .18s ease;z-index:9999}
+      .fadeout.active{opacity:1}
+      .app{opacity:0;transform:translateY(4px);transition:opacity .25s ease,transform .25s ease}
+      .app.ready{opacity:1;transform:none}
+      @media (max-width:900px){.appbar-inner{grid-template-columns:1fr;gap:10px}nav.nav{justify-content:flex-start;overflow:auto}.widgets{flex-wrap:wrap}}
+      /* ====================================================================
+      [FIM BLOCO] appbar_layout_styles
+      ==================================================================== */
+
+      /* Regras específicas do widget compacto de clima exibido no cabeçalho. */
+      /* ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] weather_mini_styles
+      [RESPONSABILIDADE] Estilos da mini-previsão (5 dias) no widget de clima
+      ==================================================================== */
+      /* Mini-previsão (discreta) */
+      .weather-widget{
+        min-width:auto;
+        white-space:nowrap;
+      }
+
+      .weather-info{
+        display:flex;
+        align-items:center;
+        line-height:1;
+      }
+
+      .weather-info .label{
+        font-size:.9rem;
+        opacity:.95;
+        white-space:nowrap;
+      }
+      /* ====================================================================
+      [FIM BLOCO] weather_mini_styles
+      ==================================================================== */
+    
+
+      /* ====================================================================
+      [BLOCO] BLOCO_STYLE
+      [NOME] sidebar_layout_styles
+      [RESPONSABILIDADE] Estilos da sidebar global, layout lateral, estados ativos e responsividade
+      ==================================================================== */
+      :root{
+        --sgp-sidebar-bg:#0f1b2a;
+        --sgp-sidebar-card:#0c1624;
+        --sgp-sidebar-border:#1c2b45;
+        --sgp-sidebar-text:#cfe4ff;
+        --sgp-sidebar-muted:#7c8aa5;
+        --sgp-sidebar-active:#143055;
+        --sgp-sidebar-active-border:#2c5a9a;
+        --sgp-sidebar-white:#ffffff;
+        --sgp-sidebar-width:260px;
+        --sgp-sidebar-collapsed-width:78px;
+      }
+
+      .sgp-shell{
+        min-height:100vh;
+        display:flex;
+        background:#f5f7fb;
+      }
+
+      .sgp-sidebar{
+        position:fixed;
+        top:5px;
+        left:0;
+        bottom:0;
+        width:var(--sgp-sidebar-width);
+        background:var(--sgp-sidebar-bg);
+        border-right:1px solid var(--sgp-sidebar-border);
+        color:var(--sgp-sidebar-white);
+        z-index:1100;
+        display:flex;
+        flex-direction:column;
+        transition:width .22s ease, transform .22s ease;
+        box-shadow:0 18px 40px rgba(0,0,0,.28);
+      }
+
+      .sgp-sidebar-line{
+        height:4px;
+        width:100%;
+        background:linear-gradient(90deg,#e60000,#FF7A00,#00AEEF,#28a745,#e60000);
+        background-size:300% 150%;
+        animation:slide 7s linear infinite;
+      }
+
+      .sgp-sidebar-header{
+        padding:18px 16px 14px;
+        border-bottom:1px solid var(--sgp-sidebar-border);
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+      }
+
+      .sgp-sidebar-brand{
+        min-width:0;
+      }
+
+      .sgp-sidebar-brand-title{
+        display:flex;
+        align-items:center;
+        gap:10px;
+        font-weight:800;
+        font-size:1.3rem;
+        line-height:1;
+        letter-spacing:.2px;
+        color:#fff;
+      }
+
+      .sgp-sidebar-brand-title i{
+        color:#00AEEF;
+      }
+
+        .sgp-sidebar-brand-subtitle {
+            display: block;
+            margin-top: 4px;
+            color: var(--sgp-sidebar-muted);
+            font-size: .82rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .sgp-sidebar-brand-subtitle.is-operator {
+            font-size: .72rem;
+            letter-spacing: .05em;
+            opacity: .75;
+        }
+
+      .sgp-sidebar-toggle{
+        width:34px;
+        height:34px;
+        border-radius:10px;
+        border:1px solid var(--sgp-sidebar-border);
+        background:var(--sgp-sidebar-card);
+        color:var(--sgp-sidebar-text);
+        cursor:pointer;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+      }
+
+      .sgp-sidebar-toggle:hover{
+        color:#fff;
+        border-color:var(--sgp-sidebar-active-border);
+      }
+
+      .sgp-sidebar-scroll{
+        flex:1;
+        overflow-y:auto;
+        padding:14px 12px;
+      }
+
+      .sgp-sidebar-section{
+        margin-bottom:18px;
+      }
+
+      .sgp-sidebar-section-title{
+        color:var(--sgp-sidebar-muted);
+        font-size:.72rem;
+        text-transform:uppercase;
+        letter-spacing:.08em;
+        margin:0 10px 8px;
+      }
+
+      .sgp-sidebar-nav{
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+      }
+
+      .sgp-sidebar-link{
+        position:relative;
+        display:flex;
+        align-items:center;
+        gap:12px;
+        min-height:42px;
+        padding:10px 12px;
+        border-radius:10px;
+        color:var(--sgp-sidebar-text);
+        text-decoration:none;
+        border:1px solid transparent;
+        transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease;
+      }
+
+      .sgp-sidebar-link:hover{
+        background:var(--sgp-sidebar-card);
+        border-color:var(--sgp-sidebar-border);
+        color:#fff;
+        transform:translateX(2px);
+      }
+
+      .sgp-sidebar-link.active{
+        background:var(--sgp-sidebar-active);
+        border-color:var(--sgp-sidebar-active-border);
+        color:#fff;
+      }
+
+      .sgp-sidebar-link i{
+        width:22px;
+        min-width:22px;
+        text-align:center;
+        font-size:1.02rem;
+      }
+
+      .sgp-sidebar-link-label{
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+      }
+
+      .sgp-sidebar-badge{
+        margin-left:auto;
+        min-width:22px;
+        height:22px;
+        padding:0 7px;
+        border-radius:999px;
+        background:#e60000;
+        color:#fff;
+        font-size:.75rem;
+        font-weight:700;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+      }
+
+      .sgp-sidebar-footer{
+        border-top:1px solid var(--sgp-sidebar-border);
+        padding:12px;
+      }
+
+      .sgp-sidebar-user{
+        display:flex;
+        align-items:center;
+        gap:10px;
+        padding:10px;
+        border-radius:12px;
+        background:var(--sgp-sidebar-card);
+        border:1px solid var(--sgp-sidebar-border);
+      }
+
+      .sgp-sidebar-user-icon{
+        width:34px;
+        height:34px;
+        border-radius:50%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        background:#143055;
+        border:1px solid #2c5a9a;
+        color:#fff;
+      }
+
+      .sgp-sidebar-user-text{
+        min-width:0;
+      }
+
+      .sgp-sidebar-user-name{
+        color:#fff;
+        font-weight:700;
+        font-size:.9rem;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+      }
+
+      .sgp-sidebar-user-role{
+        color:var(--sgp-sidebar-muted);
+        font-size:.78rem;
+      }
+
+      .sgp-content-wrap{
+        flex:1;
+        min-width:0;
+        margin-left:var(--sgp-sidebar-width);
+        transition:margin-left .22s ease;
+      }
+
+      body.sgp-sidebar-collapsed .sgp-sidebar{
+        width:var(--sgp-sidebar-collapsed-width);
+      }
+
+      body.sgp-sidebar-collapsed .sgp-content-wrap{
+        margin-left:var(--sgp-sidebar-collapsed-width);
+      }
+
+      body.sgp-sidebar-collapsed .sgp-sidebar-brand-subtitle,
+      body.sgp-sidebar-collapsed .sgp-sidebar-link-label,
+      body.sgp-sidebar-collapsed .sgp-sidebar-section-title,
+      body.sgp-sidebar-collapsed .sgp-sidebar-user-text,
+      body.sgp-sidebar-collapsed .sgp-sidebar-badge {
+          display: none;
+      }
+
+      body.sgp-sidebar-collapsed .sgp-sidebar-header{
+        justify-content:center;
+        padding-left:10px;
+        padding-right:10px;
+      }
+
+      body.sgp-sidebar-collapsed .sgp-sidebar-brand-title{
+        justify-content:center;
+      }
+
+      body.sgp-sidebar-collapsed .sgp-sidebar-brand-title span{
+        display:none;
+      }
+
+      body.sgp-sidebar-collapsed .sgp-sidebar-toggle i{
+        transform:rotate(180deg);
+      }
+
+      body.sgp-sidebar-collapsed .sgp-sidebar-link{
+        justify-content:center;
+        padding-left:10px;
+        padding-right:10px;
+      }
+
+      body.sgp-sidebar-collapsed .sgp-sidebar-link i{
+        width:auto;
+        min-width:auto;
+      }
+
+      .sgp-mobile-sidebar-open{
+        display:none;
+      }
+
+      .sgp-sidebar-backdrop{
+        display:none;
+      }
+
+      @media (max-width:900px){
+        .sgp-sidebar{
+          transform:translateX(-100%);
+          width:var(--sgp-sidebar-width);
+        }
+
+        .sgp-content-wrap{
+          margin-left:0;
+        }
+
+        body.sgp-sidebar-mobile-open .sgp-sidebar{
+          transform:translateX(0);
+        }
+
+        .sgp-sidebar-backdrop{
+          position:fixed;
+          inset:5px 0 0 0;
+          background:rgba(4,10,18,.52);
+          z-index:1090;
+        }
+
+        body.sgp-sidebar-mobile-open .sgp-sidebar-backdrop{
+          display:block;
+        }
+
+        .sgp-mobile-sidebar-open{
+          display:inline-flex;
+          width:36px;
+          height:36px;
+          border-radius:10px;
+          border:1px solid #1c2b45;
+          background:#0c1624;
+          color:#cfe4ff;
+          align-items:center;
+          justify-content:center;
+          cursor:pointer;
+        }
+
+        .sgp-mobile-sidebar-open:hover{
+          color:#fff;
+          border-color:#2c5a9a;
+        }
+
+        body.sgp-sidebar-collapsed .sgp-content-wrap{
+          margin-left:0;
+        }
+
+        body.sgp-sidebar-collapsed .sgp-sidebar{
+          width:var(--sgp-sidebar-width);
+        }
+      }
+      /* ====================================================================
+      [FIM BLOCO] sidebar_layout_styles
+      ==================================================================== */
+
+      /* ====================================================================
+      [FIM BLOCO] estilos_layout_base
+      ==================================================================== */
+    </style>
+
+    <!-- Área reservada para estilos, metas ou scripts adicionais dos templates filhos -->
+    {% block head_extra %}{% endblock %}
+  </head>
+
+  <body>
+    
+    <!-- Camada superior de destaque visual e overlay usado na transição entre rotas -->
+    <div class="topline"></div>
+    <div class="fadeout" id="fadeout"></div>
+
+    <!-- Contêiner principal da aplicação; recebe estado "ready" após o bootstrap visual -->
+    <div class="app" id="app">
+      <!-- ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] sidebar_global_navigation
+      [RESPONSABILIDADE] Renderizar sidebar global de navegação do SGP
+      ==================================================================== -->
+      <div class="sgp-sidebar-backdrop" id="sgp-sidebar-backdrop"></div>
+
+      <aside class="sgp-sidebar" id="sgp-sidebar" aria-label="Navegação lateral principal">
+        <div class="sgp-sidebar-line"></div>
+
+        <div class="sgp-sidebar-header">
+          <div class="sgp-sidebar-brand">
+            <div class="sgp-sidebar-brand-title">
+              <i class="fa-solid fa-gear"></i>
+              <span>SGP</span>
+            </div>
+              <small class="sgp-sidebar-brand-subtitle">Pneumark</small>
+              <small class="sgp-sidebar-brand-subtitle is-operator">Adriano Saraiva</small>
+            </div>
+
+          <button type="button" class="sgp-sidebar-toggle" id="sgp-sidebar-toggle" aria-label="Recolher menu">
+            <i class="fa-solid fa-angles-left"></i>
+          </button>
+        </div>
+
+        <div class="sgp-sidebar-scroll">
+          <section class="sgp-sidebar-section">
+            <h2 class="sgp-sidebar-section-title">Principal</h2>
+            <nav class="sgp-sidebar-nav">
+              <a class="sgp-sidebar-link" href="{{ url_for('modulos_bp.tela_modulos') }}" data-sidebar-match="/modulos">
+                <i class="fa-solid fa-house"></i>
+                <span class="sgp-sidebar-link-label">Dashboard</span>
+              </a>
+
+              <a class="sgp-sidebar-link" href="/producao/" data-sidebar-match="/producao">
+                <i class="fa-solid fa-chart-column"></i>
+                <span class="sgp-sidebar-link-label">Produção</span>
+              </a>
+
+              <a class="sgp-sidebar-link" href="{{ url_for('estoque_bp.tela_estoque') }}" data-sidebar-match="/estoque,/cadastrar_peca,/listar_pecas,/editar_peca,/cadastrar_fornecedor">
+                <i class="fa-solid fa-box-open"></i>
+                <span class="sgp-sidebar-link-label">Estoque</span>
+              </a>
+
+              <a class="sgp-sidebar-link" href="/compras" data-sidebar-match="/compras">
+                <i class="fa-solid fa-cart-shopping"></i>
+                <span class="sgp-sidebar-link-label">Compras</span>
+              </a>
+            </nav>
+          </section>
+
+          <section class="sgp-sidebar-section">
+            <h2 class="sgp-sidebar-section-title">Operações</h2>
+            <nav class="sgp-sidebar-nav">
+              <a class="sgp-sidebar-link" href="#" data-no-fade>
+                <i class="fa-solid fa-screwdriver-wrench"></i>
+                <span class="sgp-sidebar-link-label">Manutenção</span>
+              </a>
+
+              <a class="sgp-sidebar-link" href="#" data-no-fade>
+                <i class="fa-solid fa-shield-halved"></i>
+                <span class="sgp-sidebar-link-label">Qualidade</span>
+              </a>
+
+              <a class="sgp-sidebar-link" href="#" data-no-fade>
+                <i class="fa-solid fa-clipboard-list"></i>
+                <span class="sgp-sidebar-link-label">Ordens de Serviço</span>
+              </a>
+
+              <a class="sgp-sidebar-link" href="#" data-no-fade>
+                <i class="fa-solid fa-screwdriver"></i>
+                <span class="sgp-sidebar-link-label">Ferramentaria</span>
+              </a>
+            </nav>
+          </section>
+
+          <section class="sgp-sidebar-section">
+            <h2 class="sgp-sidebar-section-title">Gestão</h2>
+            <nav class="sgp-sidebar-nav">
+              <a class="sgp-sidebar-link" href="#" data-no-fade>
+                <i class="fa-solid fa-users"></i>
+                <span class="sgp-sidebar-link-label">RH</span>
+              </a>
+
+              <a class="sgp-sidebar-link" href="#" data-no-fade>
+                <i class="fa-solid fa-chart-line"></i>
+                <span class="sgp-sidebar-link-label">Indicadores</span>
+              </a>
+
+              <a class="sgp-sidebar-link" href="#" data-no-fade>
+                <i class="fa-regular fa-bell"></i>
+                <span class="sgp-sidebar-link-label">Avisos</span>
+                <span class="sgp-sidebar-badge">8</span>
+              </a>
+            </nav>
+          </section>
+
+          <section class="sgp-sidebar-section">
+            <h2 class="sgp-sidebar-section-title">Sistema</h2>
+            <nav class="sgp-sidebar-nav">
+              <a class="sgp-sidebar-link" href="#" data-no-fade>
+                <i class="fa-solid fa-gear"></i>
+                <span class="sgp-sidebar-link-label">Configurações</span>
+              </a>
+            </nav>
+          </section>
+        </div>
+
+        <div class="sgp-sidebar-footer">
+          <div class="sgp-sidebar-user">
+            <div class="sgp-sidebar-user-icon">
+              <i class="fa-regular fa-circle-user"></i>
+            </div>
+            
+
+            <div class="sgp-sidebar-user-text">
+              <div class="sgp-sidebar-user-name">
+                {{ (current_user.username if current_user.is_authenticated else 'Operador') if current_user is defined else 'Operador' }}
+              </div>
+              <div class="sgp-sidebar-user-role">{% block sidebar_role %}Operador{% endblock %}</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+      <!-- ====================================================================
+      [FIM BLOCO] sidebar_global_navigation
+      ==================================================================== -->
+
+      <div class="sgp-shell">
+        <div class="sgp-content-wrap">
+      <header class="appbar" role="banner">
+        <div class="appbar-inner">
+          <button type="button" class="sgp-mobile-sidebar-open" id="sgp-mobile-sidebar-open" aria-label="Abrir menu lateral">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+
+          <!-- Identidade visual do sistema e identificação textual do módulo atual -->
+          <div class="brand">
+            <img class="brand-logo" src="{{ url_for('static', filename='img/Logo jpg.jpg') }}" alt="Pneumark">
+            <div>
+              <h1>Pneumark SGP</h1>
+              <small>{% block module_name %}Módulo{% endblock %}</small>
+            </div>
+          </div>
+
+          <!-- ====================================================================
+          [BLOCO] BLOCO_UTIL
+          [NOME] global_navigation
+          [RESPONSABILIDADE] Renderizar navegação principal do sistema
+          ==================================================================== -->
+          <!-- Navegação principal com links globais reutilizados por todos os módulos -->
+          <!-- Navegação -->
+          <nav class="nav">
+            <a href="{{ url_for('modulos_bp.tela_modulos') }}"
+              data-no-fade translate="no">Home</a>
+          </nav>
+          <!-- ====================================================================
+          [FIM BLOCO] global_navigation
+          ==================================================================== -->
+
+          <!-- ====================================================================
+          [BLOCO] BLOCO_UTIL
+          [NOME] global_widgets
+          [RESPONSABILIDADE] Exibir widgets globais (relógio, clima, frase do dia e usuário/logout)
+          ==================================================================== -->
+          <!-- Área de utilidades globais do cabeçalho para contexto operacional do usuário -->
+          <!-- Widgets globais -->
+          <div class="widgets">
+            <div class="widget" title="Data e hora local">
+              <i class="fa-regular fa-clock"></i>
+              <!-- <div class="label">Hora</div> -->
+              <strong id="clock">--:--</strong>
+            </div>
+
+            <div class="widget weather-widget" title="Clima atual">
+              <i class="fa-solid fa-cloud-sun"></i>
+              <div class="weather-info">
+                <div class="label" id="weather-label">Carregando...</div>
+                <strong id="weather">--°C</strong>
+              </div>
+            </div>
+
+            <div class="motd" title="Mensagem do dia">
+              <i class="fa-regular fa-lightbulb"></i>
+              <span class="motd-quote" id="motd-text">Carregando frase do dia…</span>
+            </div>
+
+            <!-- Exibe o usuário autenticado e disponibiliza ação de logout quando aplicável -->
+            <div class="userchip" aria-label="Usuário atual">
+              <i class="fa-regular fa-circle-user"></i>
+
+              <span>
+                {{ (current_user.username if current_user.is_authenticated else 'Operador') if current_user is defined else 'Operador' }}
+              </span>
+
+              {% if current_user.is_authenticated %}
+                <form action="{{ url_for('login_bp.logout') }}" method="post" style="display:inline;">
+                  <button type="submit" class="logout-btn" aria-label="Sair">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                  </button>
+                </form>
+              {% endif %}
+            </div>
+
+            <!-- <div class="userchip" aria-label="Usuário atual">
+              <i class="fa-regular fa-circle-user"></i>
+              <span>
+                {{ (current_user.name if current_user.is_authenticated else 'Operador') if current_user is defined else 'Operador' }}
+              </span>
+            </div> -->
+          </div>
+          <!-- ====================================================================
+          [FIM BLOCO] global_widgets
+          ==================================================================== -->
+        </div>
+      </header>
+
+      <!-- ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] flash_messages
+      [RESPONSABILIDADE] Renderizar mensagens flash do backend (com categorias)
+      ==================================================================== -->
+      <!-- Canal padrão para feedbacks do backend enviados via Flask flash -->
+      <!-- FLASHES -->
+      <div class="flash-container container h-0">
+        {% with msgs = get_flashed_messages(with_categories=true) %}
+          {% if msgs %}
+            {% for cat, msg in msgs %}
+              <div class="flash {{ cat }}">{{ msg }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+      </div>
+      <!-- ====================================================================
+      [FIM BLOCO] flash_messages
+      ==================================================================== -->
+
+      <!-- ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] main_content
+      [RESPONSABILIDADE] Área principal para toolbar e conteúdo dos módulos (blocks Jinja)
+      ==================================================================== -->
+      <!-- Região central extensível onde cada template filho injeta sua interface -->
+      <main class="container" role="main">
+        {% block toolbar %}{% endblock %}
+        {% block content %}{% endblock %}
+      </main>
+      <!-- ====================================================================
+      [FIM BLOCO] main_content
+      ==================================================================== -->
+
+      <!-- ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] footer_block
+      [RESPONSABILIDADE] Renderizar rodapé padrão (block Jinja para sobrescrita)
+      ==================================================================== -->
+      <!-- Rodapé padrão sobrescrevível para necessidades específicas de cada módulo -->
+      {% block footer %}
+        <div class="footer">© {{ now().year if now is defined else '' }} Pneumark — SGP</div>
+      {% endblock %}
+      <!-- ====================================================================
+      [FIM BLOCO] footer_block
+      ==================================================================== -->
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* Script global do layout base.
+         Fornece comportamentos compartilhados sem depender do conteúdo dos módulos. */
+      /* ====================================================================
+      [BLOCO] BLOCO_SCRIPT
+      [NOME] scripts_layout_base
+      [RESPONSABILIDADE] Agrupar scripts utilitários globais do layout base
+      ==================================================================== */
+
+      const app = document.getElementById('app');
+      const fadeout = document.getElementById('fadeout');
+      const clockEl = document.getElementById('clock');
+      const weatherEl = document.getElementById('weather');
+      const weatherLabelEl = document.getElementById('weather-label');
+      const motdEl = document.getElementById('motd-text');
+
+      const ROUTE_FADE_DELAY_MS = 180;
+      const CLOCK_REFRESH_INTERVAL_MS = 15000;
+
+      const WEATHER_FIXED = {
+        label: "Embu-Guaçu",
+        status: "Clima indisponível"
+      };
+
+      /* Bootstrap visual inicial da aplicação após a primeira renderização do DOM. */
+      /* ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] app_entry_animation
+      [RESPONSABILIDADE] Aplicar animação de entrada suave ao carregar a aplicação
+      ==================================================================== */
+      // Entrada suave
+      function initAppEntryAnimation() {
+        if (!app) return;
+        requestAnimationFrame(() => app.classList.add('ready'));
+      }
+
+      initAppEntryAnimation();
+      /* ====================================================================
+      [FIM BLOCO] app_entry_animation
+      ==================================================================== */
+
+      /* Controla a navegação com transição visual antes do redirecionamento da página. */
+      /* ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] route_fade_navigation
+      [RESPONSABILIDADE] Interceptar cliques em links e aplicar efeito de fade-out na navegação
+      ==================================================================== */
+      // Saída com fade
+
+      // Executa redirecionamento com atraso controlado para sincronizar a animação de saída.
+      function routeTo(href) {
+        if (!href || !fadeout) return;
+        fadeout.classList.add('active');
+        setTimeout(() => window.location.assign(href), ROUTE_FADE_DELAY_MS);
+      }
+
+      function bindRouteFadeNavigation() {
+        document.addEventListener('click', (e) => {
+          const a = e.target.closest('a');
+          if (!a) return;
+
+          const href = a.getAttribute('href');
+          if (!href || href.startsWith('#') || a.hasAttribute('data-no-fade')) return;
+
+          e.preventDefault();
+          routeTo(href);
+        });
+      }
+
+      bindRouteFadeNavigation();
+      /* ====================================================================
+      [FIM BLOCO] route_fade_navigation
+      ==================================================================== */
+
+      /* Atualização periódica do relógio do cabeçalho com tolerância à ausência do elemento. */
+      /* ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] clock_widget
+      [RESPONSABILIDADE] Atualizar relógio no header em intervalos regulares
+      ==================================================================== */
+      // Relógio (com guard)
+
+      // Lê a hora do navegador e formata no padrão HH:MM para exibição compacta.
+      function tickClock() {
+        if (!clockEl) return;
+
+        const d = new Date();
+        clockEl.textContent = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      }
+
+      function initClockWidget() {
+        tickClock();
+        setInterval(tickClock, CLOCK_REFRESH_INTERVAL_MS);
+      }
+
+      initClockWidget();
+      /* ====================================================================
+      [FIM BLOCO] clock_widget
+      ==================================================================== */
+
+      /* Widget de clima com previsão compacta para Embu-Guaçu. */
+      /* ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] weather_widget
+      [RESPONSABILIDADE] Buscar e exibir previsão de 3 dias no header usando API Open-Meteo
+      ==================================================================== */
+      // ===== CLIMA - PREVISÃO 3 DIAS =====
+
+      const WEATHER_API_URL = 'https://api.open-meteo.com/v1/forecast?latitude=-23.8297&longitude=-46.8136&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=3&timezone=America%2FSao_Paulo';
+
+      function weatherCodeToEmoji(code) {
+        const c = Number(code);
+
+        if (c === 0) return '☀️';
+        if ([1, 2].includes(c)) return '🌤️';
+        if (c === 3) return '☁️';
+        if ([45, 48].includes(c)) return '🌫️';
+        if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(c)) return '🌧️';
+        if ([95, 96, 99].includes(c)) return '⛈️';
+
+        return '🌡️';
+      }
+
+      function formatWeatherDayLabel(index, dateText) {
+        if (index === 0) return 'Hoje';
+        if (index === 1) return 'Amanhã';
+
+        const date = new Date(dateText + 'T00:00:00');
+        return date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+      }
+
+      function applyWeatherFallback() {
+        if (weatherLabelEl) {
+          weatherLabelEl.textContent = 'Embu-Guaçu';
+        }
+
+        if (weatherEl) {
+          weatherEl.textContent = 'Clima indisponível';
+        }
+      }
+
+      function renderWeatherForecast(daily) {
+        const days = daily.time || [];
+        const codes = daily.weather_code || [];
+        const maxTemps = daily.temperature_2m_max || [];
+        const minTemps = daily.temperature_2m_min || [];
+        const rainChance = daily.precipitation_probability_max || [];
+
+        const forecastHtml = days.slice(0, 3).map((day, index) => {
+          const emoji = weatherCodeToEmoji(codes[index]);
+          const label = formatWeatherDayLabel(index, day);
+          const max = Math.round(Number(maxTemps[index]));
+          const min = Math.round(Number(minTemps[index]));
+          const rain = Math.round(Number(rainChance[index] || 0));
+
+          return `
+            <span style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;padding:0 6px;border-left:${index === 0 ? '0' : '1px solid #1c2b45'};">
+              <span style="font-size:.72rem;opacity:.85;">${label}</span>
+              <span style="font-size:1rem;line-height:1;">${emoji}</span>
+              <span style="font-size:.72rem;line-height:1;">↑${max}°</span>
+              <span style="font-size:.72rem;line-height:1;opacity:.9;">↓${min}°</span>
+              <span style="font-size:.7rem;line-height:1;opacity:.8;">💧${rain}%</span>
+            </span>
+          `;
+        }).join('');
+
+        weatherLabelEl.textContent = 'Embu-Guaçu';
+        weatherEl.innerHTML = `
+          <span style="display:inline-flex;align-items:center;gap:2px;">
+            ${forecastHtml}
+          </span>
+        `;
+      }
+
+      function initWeatherWidget() {
+        if (!weatherLabelEl || !weatherEl) return;
+
+        weatherLabelEl.textContent = 'Embu-Guaçu';
+        weatherEl.textContent = 'Carregando...';
+
+        fetch(WEATHER_API_URL, { cache: 'no-store' })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error('Falha ao buscar previsão');
+            }
+
+            return response.json();
+          })
+          .then((data) => {
+            if (!data || !data.daily) {
+              applyWeatherFallback();
+              return;
+            }
+
+            renderWeatherForecast(data.daily);
+          })
+          .catch(() => {
+            applyWeatherFallback();
+          });
+      }
+
+      initWeatherWidget();
+      /* ====================================================================
+      [FIM BLOCO] weather_widget
+      ==================================================================== */
+
+      /* Integração frontend-backend para obtenção da frase motivacional via endpoint interno. */
+      /* ====================================================================
+      [BLOCO] BLOCO_API
+      [NOME] motd_widget
+      [RESPONSABILIDADE] Buscar frase motivacional via endpoint interno e renderizar no header
+      ==================================================================== */
+      // ===== FRASE MOTIVACIONAL =====
+      function applyMotdFallback() {
+        if (!motdEl) return;
+        motdEl.textContent = "Qualidade é fazer o simples, bem feito.";
+      }
+
+      function loadMotdWidget() {
+        if (!motdEl) return;
+
+        fetch('{{ url_for("utilidades_bp.frase_motivacional") }}', { cache: 'no-store' })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d && d.texto) {
+              motdEl.textContent = d.texto + (d.autor ? ` — ${d.autor}` : '');
+              return;
+            }
+
+            applyMotdFallback();
+          })
+          .catch(() => {
+            applyMotdFallback();
+          });
+      }
+
+      loadMotdWidget();
+      /* ====================================================================
+      [FIM BLOCO] motd_widget
+      ==================================================================== */
+
+
+      /* ====================================================================
+      [BLOCO] BLOCO_SCRIPT
+      [NOME] sidebar_global_navigation_script
+      [RESPONSABILIDADE] Controlar recolhimento, abertura mobile e item ativo da sidebar global
+      ==================================================================== */
+      const sidebarToggle = document.getElementById('sgp-sidebar-toggle');
+      const mobileSidebarOpen = document.getElementById('sgp-mobile-sidebar-open');
+      const sidebarBackdrop = document.getElementById('sgp-sidebar-backdrop');
+      const SIDEBAR_COLLAPSED_STORAGE_KEY = 'sgp_sidebar_collapsed';
+
+      function applySidebarCollapsedState() {
+        const isCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === '1';
+        document.body.classList.toggle('sgp-sidebar-collapsed', isCollapsed);
+      }
+
+      function toggleSidebarCollapsed() {
+        const nextCollapsed = !document.body.classList.contains('sgp-sidebar-collapsed');
+        document.body.classList.toggle('sgp-sidebar-collapsed', nextCollapsed);
+        localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, nextCollapsed ? '1' : '0');
+      }
+
+      function openMobileSidebar() {
+        document.body.classList.add('sgp-sidebar-mobile-open');
+      }
+
+      function closeMobileSidebar() {
+        document.body.classList.remove('sgp-sidebar-mobile-open');
+      }
+
+      function bindSidebarControls() {
+        applySidebarCollapsedState();
+
+        if (sidebarToggle) {
+          sidebarToggle.addEventListener('click', toggleSidebarCollapsed);
+        }
+
+        if (mobileSidebarOpen) {
+          mobileSidebarOpen.addEventListener('click', openMobileSidebar);
+        }
+
+        if (sidebarBackdrop) {
+          sidebarBackdrop.addEventListener('click', closeMobileSidebar);
+        }
+
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            closeMobileSidebar();
+          }
+        });
+      }
+
+      function markActiveSidebarLink() {
+        const currentPath = window.location.pathname;
+        const links = document.querySelectorAll('.sgp-sidebar-link[data-sidebar-match]');
+
+        links.forEach((link) => {
+          const matchAttr = link.getAttribute('data-sidebar-match') || '';
+          const patterns = matchAttr.split(',').map((item) => item.trim()).filter(Boolean);
+          const isActive = patterns.some((pattern) => currentPath === pattern || currentPath.startsWith(pattern + '/') || currentPath.startsWith(pattern));
+
+          link.classList.toggle('active', isActive);
+        });
+      }
+
+      bindSidebarControls();
+      markActiveSidebarLink();
+      /* ====================================================================
+      [FIM BLOCO] sidebar_global_navigation_script
+      ==================================================================== */
+
+      /* ====================================================================
+      [FIM BLOCO] scripts_layout_base
+      ==================================================================== */
+    </script>
+
+    <!-- Ponto de extensão para scripts específicos dos templates derivados -->
+    {% block scripts_extra %}{% endblock %}
+
+  </body>
+
+</html>
+<!-- ====================================================================
+[FIM BLOCO] layout_base
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: layout_base
+BLOCO_STYLE: estilos_layout_base
+BLOCO_UTIL: appbar_layout_styles
+BLOCO_UTIL: weather_mini_styles
+BLOCO_STYLE: sidebar_layout_styles
+BLOCO_UTIL: sidebar_global_navigation
+BLOCO_UTIL: global_navigation
+BLOCO_UTIL: global_widgets
+BLOCO_UTIL: flash_messages
+BLOCO_UTIL: main_content
+BLOCO_UTIL: footer_block
+BLOCO_SCRIPT: scripts_layout_base
+FUNÇÃO: initAppEntryAnimation
+BLOCO_UTIL: app_entry_animation
+FUNÇÃO: routeTo
+FUNÇÃO: bindRouteFadeNavigation
+BLOCO_UTIL: route_fade_navigation
+FUNÇÃO: tickClock
+FUNÇÃO: initClockWidget
+BLOCO_UTIL: clock_widget
+FUNÇÃO: initWeatherWidget
+BLOCO_UTIL: weather_widget
+FUNÇÃO: applyMotdFallback
+FUNÇÃO: loadMotdWidget
+BLOCO_API: motd_widget
+BLOCO_SCRIPT: sidebar_global_navigation_script
+FUNÇÃO: applySidebarCollapsedState
+FUNÇÃO: toggleSidebarCollapsed
+FUNÇÃO: openMobileSidebar
+FUNÇÃO: closeMobileSidebar
+FUNÇÃO: bindSidebarControls
+FUNÇÃO: markActiveSidebarLink
+==================================================================== -->
+
+<!-- ====================================================================
+DOCUMENTAÇÃO DO ARQUIVO
+--------------------------------------------------------------------
+
+DESCRIÇÃO GERAL
+Template base da aplicação Flask/Jinja responsável por padronizar a
+estrutura visual compartilhada, oferecer pontos de extensão via blocks
+Jinja e concentrar utilitários globais de interface.
+
+PRINCIPAIS COMPONENTES
+- Layout estrutural com header, main e footer
+- Navegação principal do sistema
+- Widgets globais de relógio, clima, frase motivacional e usuário
+- Área de mensagens flash do backend
+- Scripts utilitários de animação, navegação com fade e atualização visual
+
+DEPENDÊNCIAS IMPORTANTES
+- Flask/Jinja para renderização de blocks, url_for e condicionais
+- current_user para contexto de autenticação
+- Font Awesome para ícones da interface
+- app.css para estilos globais complementares
+- Endpoint utilidades_bp.frase_motivacional para conteúdo dinâmico da frase
+
+==================================================================== -->
+```

@@ -1,0 +1,312 @@
+{% extends "_base.html" %}
+
+{% block title %}Requisições de Compras — Pneumark SGP{% endblock %}
+
+{% block module_name %}Compras - Requisições{% endblock %}
+
+{% block head_extra %}
+<style>
+
+.kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:16px;
+    margin-bottom:24px;
+}
+
+.kpi-card{
+    background:#fff;
+    border:1px solid #dfe6ee;
+    border-radius:12px;
+    padding:18px;
+    box-shadow:0 2px 8px rgba(0,0,0,.05);
+}
+
+.kpi-card h3{
+    margin:0;
+    font-size:.9rem;
+    color:#667085;
+}
+
+.kpi-card .valor{
+    font-size:2rem;
+    font-weight:700;
+    margin-top:8px;
+}
+
+.toolbar-compras{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.btn-primary{
+    background:#c62828;
+    color:#fff;
+    text-decoration:none;
+    padding:10px 16px;
+    border-radius:8px;
+    font-weight:600;
+}
+
+.btn-primary:hover{
+    opacity:.92;
+}
+
+.filtros{
+    background:#fff;
+    border:1px solid #dfe6ee;
+    border-radius:12px;
+    padding:16px;
+    margin-bottom:20px;
+}
+
+.filtros-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:12px;
+}
+
+.filtros input,
+.filtros select{
+    padding:10px;
+    border:1px solid #d0d5dd;
+    border-radius:8px;
+}
+
+.table-wrapper{
+    background:#fff;
+    border:1px solid #dfe6ee;
+    border-radius:12px;
+    overflow:hidden;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th{
+    background:#f8f9fb;
+    text-align:left;
+    padding:12px;
+    border-bottom:1px solid #e5e7eb;
+}
+
+td{
+    padding:12px;
+    border-bottom:1px solid #eef1f4;
+}
+
+.badge{
+    padding:4px 10px;
+    border-radius:999px;
+    font-size:.8rem;
+    font-weight:600;
+}
+
+.badge-blue{
+    background:#dbeafe;
+    color:#1d4ed8;
+}
+
+.badge-yellow{
+    background:#fef3c7;
+    color:#92400e;
+}
+
+.badge-green{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.badge-red{
+    background:#fee2e2;
+    color:#991b1b;
+}
+
+.acoes a{
+    text-decoration:none;
+    font-weight:600;
+}
+
+.breadcrumb{
+    margin-bottom:20px;
+}
+
+@media(max-width:768px){
+
+    table{
+        font-size:.85rem;
+    }
+
+}
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="breadcrumb">
+    <a href="{{ url_for('compras_bp.tela_compras') }}">Compras</a>
+    /
+    <strong>Requisições</strong>
+</div>
+
+<div class="toolbar-compras">
+
+    <div>
+        <h2 style="margin:0;">Requisições de Compras</h2>
+        <small>Controle e rastreabilidade das solicitações internas</small>
+    </div>
+
+    <a class="btn-primary"
+       href="{{ url_for('requisicoes.nova_requisicao') }}">
+        <i class="fa-solid fa-plus"></i>
+        Nova Requisição
+    </a>
+
+</div>
+
+<div class="kpi-grid">
+
+    <div class="kpi-card">
+        <h3>Solicitadas</h3>
+        <div class="valor">{{ requisicoes|selectattr('status', 'equalto', 'SOLICITADA')|list|length }}</div>
+    </div>
+
+    <div class="kpi-card">
+        <h3>Aprovadas</h3>
+        <div class="valor">{{ requisicoes|selectattr('status', 'equalto', 'APROVADA')|list|length }}</div>
+    </div>
+
+    <div class="kpi-card">
+        <h3>Compradas</h3>
+        <div class="valor">{{ requisicoes|selectattr('status', 'equalto', 'COMPRADA')|list|length }}</div>
+    </div>
+
+    <div class="kpi-card">
+        <h3>Entregues</h3>
+        <div class="valor">{{ requisicoes|selectattr('status', 'equalto', 'ENTREGUE')|list|length }}</div>
+    </div>
+
+    <div class="kpi-card">
+        <h3>Total</h3>
+        <div class="valor">{{ requisicoes|length }}</div>
+    </div>
+
+</div>
+
+<div class="filtros">
+    <form method="GET" action="{{ url_for('requisicoes.listar_requisicoes') }}">
+        <div class="filtros-grid">
+
+            <input type="text" name="busca" placeholder="Buscar requisição" value="{{ busca or '' }}">
+
+            <select name="status" onchange="this.form.submit()">
+                <option value="">Todos os Status</option>
+                {% for status in status_options %}
+                <option value="{{ status }}" {% if filtro_status == status %}selected{% endif %}>
+                    {{ status|replace('_', ' ')|title }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <select name="tipo" onchange="this.form.submit()">
+                <option value="">Todos os Tipos</option>
+                {% for tipo in tipo_options %}
+                <option value="{{ tipo }}" {% if filtro_tipo == tipo %}selected{% endif %}>
+                    {{ 'Produtivo' if tipo == 'PRODUTIVO' else 'Não Produtivo' }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <select name="solicitante" onchange="this.form.submit()">
+                <option value="">Todos os Solicitantes</option>
+                {% for solicitante in solicitante_options %}
+                <option value="{{ solicitante }}" {% if filtro_solicitante == solicitante %}selected{% endif %}>
+                    {{ solicitante }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <select name="setor" onchange="this.form.submit()">
+                <option value="">Todos os Setores</option>
+                {% for setor in setor_options %}
+                <option value="{{ setor }}" {% if filtro_setor == setor %}selected{% endif %}>
+                    {{ setor }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <input type="date" name="data" value="{{ filtro_data or '' }}" onchange="this.form.submit()">
+
+        </div>
+    </form>
+</div>
+
+<div class="table-wrapper">
+
+<table>
+
+    <thead>
+        <tr>
+            <th>Nº RC</th>
+            <th>Solicitante</th>
+            <th>Setor</th>
+            <th>Tipo</th>
+            <th>Status</th>
+            <th>Data</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+
+    <tbody>
+
+        {% if requisicoes %}
+            {% for req in requisicoes %}
+            <tr>
+                <td>{{ req.numero_requisicao }}</td>
+                <td>{{ req.solicitante_nome_snapshot or 'N/A' }}</td>
+                <td>{{ req.setor or 'N/A' }}</td>
+                <td>{{ 'Produtivo' if 'PRO' in req.numero_requisicao else 'Não Produtivo' }}</td>
+                <td>
+                    {% if req.status == 'SOLICITADA' %}
+                        <span class="badge badge-blue">Solicitada</span>
+                    {% elif req.status == 'APROVADA' %}
+                        <span class="badge badge-green">Aprovada</span>
+                    {% elif req.status == 'REJEITADA' %}
+                        <span class="badge badge-red">Rejeitada</span>
+                    {% elif req.status == 'COMPRADA' %}
+                        <span class="badge badge-green">Comprada</span>
+                    {% elif req.status == 'ENTREGUE' %}
+                        <span class="badge badge-blue">Entregue</span>
+                    {% else %}
+                        <span class="badge badge-yellow">{{ req.status|replace('_', ' ')|title }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ req.data_solicitacao.strftime('%d/%m/%Y') if req.data_solicitacao else 'N/A' }}</td>
+                <td class="acoes">
+                    <a href="{{ url_for('requisicoes.detalhe_requisicao', id=req.id) }}">Visualizar</a>
+                </td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="7" style="text-align:center; padding:40px; color:#64748b;">
+                    Nenhuma requisição encontrada.
+                    <a href="{{ url_for('requisicoes.nova_requisicao') }}" style="color:#c62828; font-weight:600;">Criar primeira requisição</a>
+                </td>
+            </tr>
+        {% endif %}
+
+    </tbody>
+
+</table>
+
+</div>
+
+{% endblock %}

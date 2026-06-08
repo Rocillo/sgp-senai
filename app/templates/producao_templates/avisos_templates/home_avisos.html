@@ -1,0 +1,239 @@
+{% extends "_base.html" %}
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página da central de avisos
+==================================================================== -->
+{% block title %}Avisos da Produção — Pneumark SGP{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_subtitle
+[RESPONSABILIDADE] Definir o subtítulo da tela de avisos
+==================================================================== -->
+{% block subtitle %}Central de Ocorrências da Produção{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_subtitle
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Aplicar estilos locais da tela de avisos
+==================================================================== -->
+{% block head_extra %}
+<style>
+  /* ====================================================================
+  [BLOCO] ESTILO_LOCAL
+  [NOME] avisos_layout
+  [RESPONSABILIDADE] Estrutura visual mínima da tela principal de ocorrências
+  ==================================================================== */
+  .avisos-wrap{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+
+  .avisos-topo{
+    border:1px solid #d9e2ec;
+    border-radius:16px;
+    background:#ffffff;
+    padding:18px 20px;
+  }
+
+  .avisos-topo h1{
+    margin:0 0 8px 0;
+    font-size:24px;
+    line-height:1.2;
+    color:#122033;
+    font-weight:900;
+  }
+
+  .avisos-topo p{
+    margin:0;
+    color:#5b6d81;
+    font-size:15px;
+    line-height:1.6;
+  }
+
+  .avisos-resumo-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:14px;
+  }
+
+  .avisos-resumo-card{
+    border:1px solid #d9e2ec;
+    border-radius:16px;
+    background:#ffffff;
+    padding:16px 18px;
+  }
+
+  .avisos-resumo-label{
+    font-size:12px;
+    font-weight:900;
+    letter-spacing:.04em;
+    color:#5c7187;
+    text-transform:uppercase;
+    margin-bottom:8px;
+  }
+
+  .avisos-resumo-valor{
+    font-size:28px;
+    font-weight:900;
+    color:#122033;
+    line-height:1.1;
+    margin-bottom:6px;
+  }
+
+  .avisos-resumo-texto{
+    font-size:14px;
+    color:#607286;
+    line-height:1.5;
+  }
+
+  .avisos-faixa-filtros{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .avisos-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:800;
+    border:1px solid #d9e2ec;
+    background:#ffffff;
+    color:#41556b;
+  }
+
+  .avisos-list{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+
+  .avisos-empty{
+    background:#fff;
+    border:1px dashed #d9e2ec;
+    border-radius:16px;
+    padding:24px 20px;
+    color:#5f7286;
+    font-size:15px;
+    line-height:1.6;
+  }
+
+  @media (max-width: 780px){
+    .avisos-resumo-grid{
+      grid-template-columns:1fr;
+    }
+  }
+  /* ====================================================================
+  [FIM BLOCO] avisos_layout
+  ==================================================================== */
+</style>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar resumo e lista principal de ocorrências da produção
+==================================================================== -->
+{% block content %}
+<div class="avisos-wrap">
+
+  <div class="toolbar">
+    <div class="breadcrumb" aria-label="Você está em">
+      <a href="{{ url_for('modulos_bp.tela_modulos') }}">Módulos</a> &nbsp;/&nbsp;
+      <a href="{{ url_for('home_producao_bp.home_producao') }}">Produção</a> &nbsp;/&nbsp;
+      <strong>Ocorrências</strong>
+    </div>
+  </div>
+
+  <section class="avisos-topo">
+    <h1>Central de Ocorrências da Produção</h1>
+    <p>
+      Acompanhe ocorrências geradas pelo monitoramento da produção e registre o histórico
+      operacional de comunicação, tratamento e encerramento.
+    </p>
+  </section>
+
+  <section class="avisos-resumo-grid">
+    <div class="avisos-resumo-card">
+      <div class="avisos-resumo-label">Ocorrências Ativas</div>
+      <div class="avisos-resumo-valor">{{ avisos_qtd|default(0) }}</div>
+      <div class="avisos-resumo-texto">
+        Quantidade total de ocorrências pendentes de tratamento.
+      </div>
+    </div>
+
+    <div class="avisos-resumo-card">
+      <div class="avisos-resumo-label">Situação Geral</div>
+      <div class="avisos-resumo-valor">{{ 'ALERTA' if avisos_qtd|default(0)|int > 0 else 'OK' }}</div>
+      <div class="avisos-resumo-texto">
+        Situação geral do monitoramento automático da produção.
+      </div>
+    </div>
+  </section>
+
+  <section class="avisos-faixa-filtros">
+    <span class="avisos-chip">Capacidade Produtiva</span>
+    <span class="avisos-chip">Origem: Monitoramento Automático</span>
+    <span class="avisos-chip">Histórico Operacional</span>
+  </section>
+
+  <section class="avisos-list">
+    {% if avisos and avisos|length > 0 %}
+      {% for aviso in avisos %}
+        {% include "producao_templates/avisos_templates/card_aviso.html" %}
+      {% endfor %}
+    {% else %}
+      <div class="avisos-empty">
+        Nenhuma ocorrência carregada no momento. Quando houver novos alertas operacionais,
+        eles aparecerão aqui.
+      </div>
+    {% endif %}
+  </section>
+
+</div>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_scripts
+[RESPONSABILIDADE] Reservar scripts futuros da central de ocorrências
+==================================================================== -->
+{% block scripts %}
+<script>
+  // Tela inicial sem scripts específicos nesta fase.
+</script>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_scripts
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_subtitle
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_content
+DOCUMENTO_HTML: block_scripts
+ESTILO_LOCAL: avisos_layout
+==================================================================== -->

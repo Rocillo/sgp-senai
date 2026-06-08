@@ -1,0 +1,634 @@
+<!-- ====================================================================
+[BLOCO] COMPONENTE_HTML
+[NOME] card_aviso_item
+[RESPONSABILIDADE] Renderizar um aviso individual da central de avisos da produção
+==================================================================== -->
+
+{% set borda_aviso = '#2457a6' %}
+{% set fundo_aviso = '#f7fbff' %}
+{% set icone_cor = '#2457a6' %}
+{% set selo_fundo = '#eef5ff' %}
+{% set selo_borda = '#cfe0ff' %}
+{% set selo_cor = '#2457a6' %}
+{% set status_label = 'INFO' %}
+
+{% if aviso.status == 'resolvido' %}
+  {% set borda_aviso = '#1f8b4c' %}
+  {% set fundo_aviso = '#f3fbf6' %}
+  {% set icone_cor = '#1f8b4c' %}
+  {% set selo_fundo = '#e8f7ee' %}
+  {% set selo_borda = '#bfe3cc' %}
+  {% set selo_cor = '#1f6f3f' %}
+  {% set status_label = 'RESOLVIDO' %}
+{% elif aviso.status == 'em_tratamento' %}
+  {% set borda_aviso = '#b7791f' %}
+  {% set fundo_aviso = '#fffaf2' %}
+  {% set icone_cor = '#9a6700' %}
+  {% set selo_fundo = '#fff1d6' %}
+  {% set selo_borda = '#f3d08b' %}
+  {% set selo_cor = '#8a5a00' %}
+  {% set status_label = 'EM TRATAMENTO' %}
+{% elif aviso.severidade == 'critico' %}
+  {% set borda_aviso = '#c40000' %}
+  {% set fundo_aviso = '#fff6f6' %}
+  {% set icone_cor = '#b00000' %}
+  {% set selo_fundo = '#fff0f0' %}
+  {% set selo_borda = '#f0b9b9' %}
+  {% set selo_cor = '#a10000' %}
+  {% set status_label = 'CRÍTICO' %}
+{% elif aviso.severidade == 'atencao' %}
+  {% set borda_aviso = '#d18a00' %}
+  {% set fundo_aviso = '#fffaf2' %}
+  {% set icone_cor = '#9a6700' %}
+  {% set selo_fundo = '#fff4db' %}
+  {% set selo_borda = '#f0d39b' %}
+  {% set selo_cor = '#8a5a00' %}
+  {% set status_label = 'ATENÇÃO' %}
+{% endif %}
+
+{% set ocorrencia_codigo = aviso.ocorrencia_codigo or aviso.codigo or 'OC-—' %}
+{% set tipo_ocorrencia = aviso.tipo_label or aviso.tipo or aviso.titulo or 'Ocorrência' %}
+{% set origem_ocorrencia = aviso.origem or 'Monitoramento Automático' %}
+{% set responsavel_ocorrencia = aviso.departamento_responsavel|default('', true) %}
+
+<article
+  class="aviso-item"
+  data-codigo-aviso="{{ aviso.codigo }}"
+  data-status="{{ aviso.status|default('novo') }}"
+  style="border-left:8px solid {{ borda_aviso }}; background: {{ fundo_aviso }};"
+>
+  <div class="aviso-main">
+    <div class="aviso-icon" aria-hidden="true" style="color: {{ icone_cor }};">
+      {% if aviso.status == 'resolvido' %}
+        <i class="fa-solid fa-circle-check"></i>
+      {% elif aviso.severidade == 'critico' %}
+        <i class="fa-solid fa-circle-exclamation"></i>
+      {% elif aviso.severidade == 'atencao' %}
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      {% else %}
+        <i class="fa-solid fa-circle-info"></i>
+      {% endif %}
+    </div>
+
+    <div class="aviso-body">
+
+      <!-- ====================================================================
+[BLOCO] CABECALHO_OCORRENCIA
+[NOME] cabecalho_identidade_ocorrencia
+[RESPONSABILIDADE] Exibir identidade principal da ocorrência de forma rastreável
+==================================================================== -->
+<section class="aviso-cabecalho-ocorrencia">
+  <div class="aviso-faixa-principal">
+    <span class="aviso-ocorrencia-codigo">{{ ocorrencia_codigo }}</span>
+    <span
+      class="aviso-selo-status"
+      style="background: {{ selo_fundo }}; border-color: {{ selo_borda }}; color: {{ selo_cor }};"
+    >
+      {{ status_label }}
+    </span>
+  </div>
+
+  <h3 class="aviso-titulo-ocorrencia">{{ tipo_ocorrencia }}</h3>
+
+  <div class="aviso-meta-principal">
+    <div class="aviso-meta-item">
+      <span class="aviso-meta-chave">Origem</span>
+      <span class="aviso-meta-valor">{{ origem_ocorrencia }}</span>
+    </div>
+
+    <div class="aviso-meta-item">
+      <span class="aviso-meta-chave">Responsável</span>
+      <span class="aviso-meta-valor">
+        {% if responsavel_ocorrencia %}
+          {{ responsavel_ocorrencia|title }}
+        {% else %}
+          —
+        {% endif %}
+      </span>
+    </div>
+
+    <div class="aviso-meta-item">
+      <span class="aviso-meta-chave">Aberta em</span>
+      <span class="aviso-meta-valor">
+        {% if aviso.data_aviso %}
+          {{ aviso.data_aviso.strftime('%d/%m/%Y %H:%M') if aviso.data_aviso.strftime is defined else aviso.data_aviso }}
+        {% else %}
+          —
+        {% endif %}
+      </span>
+    </div>
+
+    <div class="aviso-meta-item">
+      <span class="aviso-meta-chave">Modelo</span>
+      <span class="aviso-meta-valor">{{ aviso.modelo|default('—') }}</span>
+    </div>
+  </div>
+</section>
+<!-- ====================================================================
+[FIM BLOCO] cabecalho_identidade_ocorrencia
+==================================================================== -->
+
+      <p class="aviso-resumo">{{ aviso.descricao|default('Sem descrição informada.') }}</p>
+
+      <!-- ====================================================================
+      [BLOCO] DADOS_OCORRENCIA
+      [NOME] bloco_dados_ocorrencia
+      [RESPONSABILIDADE] Exibir dados técnicos essenciais da ocorrência
+      ==================================================================== -->
+      <section class="aviso-bloco-tecnico">
+        <div class="aviso-bloco-titulo">DADOS DA OCORRÊNCIA</div>
+
+        <div class="aviso-grade-tecnica">
+          <div class="aviso-linha-tecnica">
+            <span class="aviso-chave">Capacidade Atual</span>
+            <span class="aviso-valor">{{ aviso.capacidade_atual|default('—') }}</span>
+          </div>
+
+          <div class="aviso-linha-tecnica">
+            <span class="aviso-chave">Estoque Máximo</span>
+            <span class="aviso-valor">{{ aviso.estoque_maximo|default('—') }}</span>
+          </div>
+
+          <div class="aviso-linha-tecnica">
+            <span class="aviso-chave">Lido por</span>
+            <span class="aviso-valor">
+              <span class="aviso-lido-por">{{ aviso.lido_por_nome or aviso.lido_por or '—' }}</span>
+              <span class="aviso-lido-em">
+                {% if aviso.lido_em %}
+                  às {{ aviso.lido_em.strftime('%d/%m/%Y %H:%M') if aviso.lido_em.strftime is defined else aviso.lido_em }}
+                {% endif %}
+              </span>
+            </span>
+          </div>
+
+          <div class="aviso-linha-tecnica">
+            <span class="aviso-chave">Código Técnico</span>
+            <span class="aviso-valor">{{ aviso.codigo|default('—') }}</span>
+          </div>
+        </div>
+      </section>
+      <!-- ====================================================================
+      [FIM BLOCO] bloco_dados_ocorrencia
+      ==================================================================== -->
+
+      <!-- ====================================================================
+      [BLOCO] ACOES_OCORRENCIA
+      [NOME] bloco_acoes_ocorrencia
+      [RESPONSABILIDADE] Permitir comunicação rápida da ocorrência aos setores
+      ==================================================================== -->
+      <div class="aviso-acoes">
+        <button type="button" class="aviso-btn btn-comunicar-aviso" data-setor="compras">Comunicar Compras</button>
+        <button type="button" class="aviso-btn btn-comunicar-aviso" data-setor="qualidade">Comunicar Qualidade</button>
+        <button type="button" class="aviso-btn btn-comunicar-aviso" data-setor="projetos">Comunicar Projetos</button>
+      </div>
+      <!-- ====================================================================
+      [FIM BLOCO] bloco_acoes_ocorrencia
+      ==================================================================== -->
+
+      <!-- ====================================================================
+      [BLOCO] HISTORICO_OCORRENCIA
+      [NOME] bloco_historico_operacional
+      [RESPONSABILIDADE] Exibir trilha operacional vinculada à ocorrência
+      ==================================================================== -->
+      <section class="aviso-bloco-tecnico">
+        <div class="aviso-bloco-titulo">HISTÓRICO OPERACIONAL</div>
+
+        <div class="aviso-historico-lista">
+          {% if aviso.historico %}
+            {% for evento in aviso.historico %}
+              <div class="aviso-historico-item">
+                <div class="aviso-historico-cabecalho">
+                  <span class="aviso-historico-oc">{{ ocorrencia_codigo }}</span>
+                  <span class="aviso-historico-tipo">{{ tipo_ocorrencia }}</span>
+                </div>
+                <div class="aviso-historico-texto">{{ evento }}</div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="aviso-historico-item">
+              <div class="aviso-historico-cabecalho">
+                <span class="aviso-historico-oc">{{ ocorrencia_codigo }}</span>
+                <span class="aviso-historico-tipo">{{ tipo_ocorrencia }}</span>
+              </div>
+              <div class="aviso-historico-texto">Nenhum evento operacional registrado até o momento.</div>
+            </div>
+          {% endif %}
+        </div>
+      </section>
+      <!-- ====================================================================
+      [FIM BLOCO] bloco_historico_operacional
+      ==================================================================== -->
+
+      <!-- ====================================================================
+      [BLOCO] PECAS_CRITICAS
+      [NOME] bloco_pecas_criticas
+      [RESPONSABILIDADE] Exibir peças críticas relacionadas à recomposição
+      ==================================================================== -->
+      <section class="aviso-bloco-tecnico">
+        <div class="aviso-bloco-titulo">PEÇAS CRÍTICAS PARA RECOMPOSIÇÃO</div>
+
+        <div class="aviso-pecas-lista">
+          {% for peca in aviso.pecas_criticas %}
+            <div class="aviso-peca-item">
+              <div class="aviso-peca-topo">
+                <span class="aviso-peca-codigo">[{{ peca.codigo }}]</span>
+                <span class="aviso-peca-descricao">{{ peca.descricao }}</span>
+              </div>
+
+              <div class="aviso-peca-detalhes">
+                <span><strong>Estoque atual:</strong> {{ peca.estoque_atual }}</span>
+                <span><strong>Necessário p/ estoque máximo:</strong> {{ peca.necessario_para_maximo }}</span>
+                <span><strong>Quantidade:</strong> [ ]</span>
+              </div>
+            </div>
+          {% else %}
+            <div class="aviso-peca-vazio">Nenhuma peça crítica listada.</div>
+          {% endfor %}
+        </div>
+      </section>
+      <!-- ====================================================================
+      [FIM BLOCO] bloco_pecas_criticas
+      ==================================================================== -->
+
+    </div>
+  </div>
+</article>
+
+<style>
+  .aviso-item{
+    border:1px solid #d9e2ec;
+    border-radius:16px;
+    padding:18px 20px;
+    box-shadow:none;
+  }
+
+  .aviso-main{
+    display:flex;
+    align-items:flex-start;
+    gap:16px;
+  }
+
+  .aviso-icon{
+    width:48px;
+    height:48px;
+    border-radius:14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto;
+    font-size:22px;
+    border:1px solid #d7e1ec;
+    background:#fff;
+  }
+
+  .aviso-body{
+    min-width:0;
+    flex:1 1 auto;
+  }
+
+  .aviso-cabecalho-ocorrencia{
+    margin-bottom:14px;
+  }
+
+  .aviso-faixa-principal{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:8px;
+  }
+
+  .aviso-ocorrencia-codigo{
+    display:inline-flex;
+    align-items:center;
+    padding:6px 10px;
+    border-radius:999px;
+    border:1px solid #cfd9e5;
+    background:#ffffff;
+    color:#102033;
+    font-size:13px;
+    font-weight:900;
+    letter-spacing:.03em;
+    text-transform:uppercase;
+  }
+
+  .aviso-selo-status{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:5px 9px;
+    border:1px solid #d7e1ec;
+    border-radius:999px;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.03em;
+    line-height:1;
+    text-transform:uppercase;
+    background:#fff;
+    color:#31485f;
+  }
+
+  .aviso-titulo-ocorrencia{
+    margin:0 0 10px 0;
+    font-size:22px;
+    line-height:1.2;
+    color:#102033;
+    font-weight:900;
+  }
+
+  .aviso-meta-principal{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:10px 16px;
+  }
+
+  .aviso-meta-item{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+  }
+
+  .aviso-meta-chave{
+    font-size:11px;
+    font-weight:800;
+    color:#5c7187;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+  }
+
+  .aviso-meta-valor{
+    font-size:14px;
+    font-weight:800;
+    color:#14283d;
+    line-height:1.4;
+  }
+
+  .aviso-resumo{
+    margin:0 0 14px 0;
+    font-size:15px;
+    line-height:1.55;
+    color:#30465d;
+  }
+
+  .aviso-bloco-tecnico{
+    margin-top:14px;
+    border:1px solid #d8e1eb;
+    border-radius:12px;
+    background:#f4f7fb;
+    padding:14px 16px;
+  }
+
+  .aviso-bloco-titulo{
+    margin:0 0 12px 0;
+    font-size:12px;
+    font-weight:900;
+    letter-spacing:.05em;
+    color:#1b3147;
+    text-transform:uppercase;
+  }
+
+  .aviso-grade-tecnica{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:10px 18px;
+  }
+
+  .aviso-linha-tecnica{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+
+  .aviso-chave{
+    font-size:12px;
+    font-weight:800;
+    color:#5c7187;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+  }
+
+  .aviso-valor{
+    font-size:15px;
+    font-weight:800;
+    color:#14283d;
+    line-height:1.35;
+  }
+
+  .aviso-acoes{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:14px;
+  }
+
+  .aviso-btn{
+    min-height:40px;
+    padding:0 14px;
+    border:1px solid #bccbdb;
+    border-radius:10px;
+    background:#ffffff;
+    color:#11253a;
+    font-size:13px;
+    font-weight:900;
+    letter-spacing:.01em;
+    cursor:pointer;
+    transition:.15s ease;
+  }
+
+  .aviso-btn:hover{
+    background:#eef3f8;
+  }
+
+  .aviso-btn:disabled{
+    cursor:not-allowed;
+    opacity:.72;
+  }
+
+  .aviso-historico-lista{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .aviso-historico-item{
+    border:1px solid #d6dfeb;
+    border-radius:10px;
+    background:#fff;
+    padding:10px 12px;
+  }
+
+  .aviso-historico-cabecalho{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:6px;
+  }
+
+  .aviso-historico-oc{
+    font-size:12px;
+    font-weight:900;
+    color:#102033;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+  }
+
+  .aviso-historico-tipo{
+    font-size:12px;
+    font-weight:800;
+    color:#516579;
+  }
+
+  .aviso-historico-texto{
+    font-size:13px;
+    line-height:1.55;
+    color:#314960;
+  }
+
+  .aviso-pecas-lista{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .aviso-peca-item,
+  .aviso-peca-vazio{
+    border:1px solid #d6dfeb;
+    border-radius:10px;
+    background:#fff;
+    padding:12px 14px;
+  }
+
+  .aviso-peca-topo{
+    display:flex;
+    align-items:flex-start;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:8px;
+  }
+
+  .aviso-peca-codigo{
+    font-size:13px;
+    font-weight:900;
+    color:#16304a;
+  }
+
+  .aviso-peca-descricao{
+    font-size:14px;
+    font-weight:700;
+    color:#20384f;
+  }
+
+  .aviso-peca-detalhes{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+    font-size:13px;
+    line-height:1.5;
+    color:#40586f;
+  }
+
+  @media (max-width: 860px){
+    .aviso-grade-tecnica,
+    .aviso-meta-principal{
+      grid-template-columns:1fr;
+    }
+  }
+
+  @media (max-width: 640px){
+    .aviso-main{
+      flex-direction:column;
+    }
+
+    .aviso-peca-detalhes{
+      flex-direction:column;
+      gap:4px;
+    }
+
+    .aviso-acoes{
+      flex-direction:column;
+    }
+
+    .aviso-btn{
+      width:100%;
+    }
+  }
+</style>
+
+<script>
+  (function () {
+    const scripts = document.querySelectorAll('article[data-codigo-aviso]');
+    const card = scripts[scripts.length - 1];
+    if (!card || card.dataset.jsBound === "1") return;
+    card.dataset.jsBound = "1";
+
+    const codigoAviso = card.dataset.codigoAviso;
+    const botoes = card.querySelectorAll(".btn-comunicar-aviso");
+    const historico = card.querySelector(".aviso-historico-lista");
+    const badge = card.querySelector(".aviso-selo-status");
+    const ocorrenciaCodigo = card.querySelector(".aviso-ocorrencia-codigo")?.textContent?.trim() || "OC-—";
+    const tipoOcorrencia = card.querySelector(".aviso-titulo-ocorrencia")?.textContent?.trim() || "Ocorrência";
+
+    async function comunicar(setor, botao) {
+      botao.disabled = true;
+
+      try {
+        const resp = await fetch(`/producao/avisos/action/${codigoAviso}/comunicar/${setor}`, {
+          method: "POST",
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok || !data.ok) {
+          throw new Error(data.erro || "Falha ao comunicar setor.");
+        }
+
+        if (badge) {
+          badge.textContent = "EM TRATAMENTO";
+          badge.style.background = "#fff1d6";
+          badge.style.borderColor = "#f3d08b";
+          badge.style.color = "#8a5a00";
+        }
+
+        card.dataset.status = "em_tratamento";
+        card.style.borderLeftColor = "#b7791f";
+        card.style.background = "#fffaf2";
+
+        if (historico) {
+          const item = document.createElement("div");
+          item.className = "aviso-historico-item";
+          item.innerHTML = `
+            <div class="aviso-historico-cabecalho">
+              <span class="aviso-historico-oc">${ocorrenciaCodigo}</span>
+              <span class="aviso-historico-tipo">${tipoOcorrencia}</span>
+            </div>
+            <div class="aviso-historico-texto">Evento: comunicado ao setor ${data.setor} por ${data.usuario} em ${data.quando}.</div>
+          `;
+          historico.prepend(item);
+        }
+
+        if (data.whatsapp_web_url) {
+          window.open(data.whatsapp_web_url, "_blank", "noopener,noreferrer");
+        }
+
+        botoes.forEach((b) => {
+          b.disabled = true;
+        });
+      } catch (err) {
+        alert(err.message || "Erro ao comunicar setor.");
+        botao.disabled = false;
+      }
+    }
+
+    botoes.forEach((botao) => {
+      botao.addEventListener("click", () => {
+        comunicar(botao.dataset.setor, botao);
+      });
+    });
+  })();
+</script>
+
+<!-- ====================================================================
+[FIM BLOCO] card_aviso_item
+==================================================================== -->

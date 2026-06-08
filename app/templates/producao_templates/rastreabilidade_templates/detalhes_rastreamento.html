@@ -1,0 +1,588 @@
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] rastreabilidade_serial_template
+[RESPONSABILIDADE] Template Jinja da página de rastreabilidade por serial com layout, estilos (tela/print) e script de consumo da API para montar relatório (gerais, Hi-Pot, checklist, timeline)
+==================================================================== -->
+{% extends "_base.html" %}
+
+{% block title %}Rastreabilidade • {{ serial }}{% endblock %}
+{% block module_name %}Rastreabilidade{% endblock %}
+
+<!-- ====================================================================
+[BLOCO] BLOCO_JINJA
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar o relatório (breadcrumb, cabeçalho, seções) e aplicar CSS (tela + impressão) + JS (fetch da API e renderização dos dados)
+==================================================================== -->
+{% block content %}
+<style>
+  /* --- ESTILOS VISUAIS (TELA) --- */
+  .card-trace { padding:24px; margin:20px auto; max-width:1100px; }
+  .section-box { margin-bottom: 24px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .section-title { margin: 0 0 12px; font-size: 1.1em; color: #1e293b; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; font-weight: 700; }
+  
+  .kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .kv-item { font-size: 0.9rem; color: #475569; }
+  .kv-item strong { color: #0f172a; display: block; margin-bottom: 2px; }
+
+  /* Chips de status */
+  .chip { display: inline-block; padding: 2px 8px; border-radius: 99px; font-weight: 700; font-size: 0.75rem; border: 1px solid transparent; }
+  .chip.success { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+  .chip.warning { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+  .chip.danger { background: #fee2e2; color: #7f1d1d; border-color: #fecaca; }
+  .chip.neutral { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+
+  /* Timeline vertical */
+  .timeline-item { position: relative; padding-left: 20px; margin-bottom: 10px; border-left: 2px solid #e2e8f0; }
+  .timeline-item::before { content: ''; position: absolute; left: -5px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
+  .timeline-item.active { border-left-color: #3b82f6; }
+  .timeline-item.active::before { background: #3b82f6; }
+
+  /* --- ESTILOS DE IMPRESSÃO (CORRIGIDO) --- */
+  /* --- ESTILOS DE IMPRESSÃO (VERSÃO OTIMIZADA PARA PAPEL A4) --- */
+      @media print {
+
+    /* ----------------------------------------------------------------
+    [1] Configuração física da página
+    ---------------------------------------------------------------- */
+    @page {
+      size: A4 portrait;
+      margin: 8mm;
+    }
+
+    /* ----------------------------------------------------------------
+    [2] Oculta elementos do layout global e botões
+    ---------------------------------------------------------------- */
+    .appbar,
+    .topline,
+    .footer,
+    .flash-container,
+    nav,
+    .btn,
+    .no-print {
+      display: none !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [3] Reset agressivo contra scale/zoom/flex/grid herdado
+    ---------------------------------------------------------------- */
+    html,
+    body,
+    .app,
+    .container,
+    .content,
+    main,
+    .card,
+    .card-trace {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: none !important;
+      height: auto !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+      box-shadow: none !important;
+      border: none !important;
+      display: block !important;
+      position: static !important;
+      transform: none !important;
+      scale: 1 !important;
+      zoom: 1 !important;
+      filter: none !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [4] Base tipográfica do papel
+    ---------------------------------------------------------------- */
+    html,
+    body {
+      font-size: 14pt !important;
+      line-height: 1.35 !important;
+      color: #000 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color: #000 !important;
+      transform: none !important;
+      zoom: 1 !important;
+      box-sizing: border-box !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [5] Área útil do relatório no papel
+    Faz o conteúdo ocupar praticamente toda a folha A4
+    ---------------------------------------------------------------- */
+    .card-trace {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [6] Breadcrumb não precisa no papel
+    ---------------------------------------------------------------- */
+    nav[aria-label="breadcrumb"] {
+      display: none !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [7] Cabeçalho principal do relatório impresso
+    ---------------------------------------------------------------- */
+    .print-header-only {
+      display: block !important;
+      margin: 0 0 12px 0 !important;
+      padding-bottom: 8px !important;
+      border-bottom: 2px solid #000 !important;
+      width: 100% !important;
+    }
+
+    .print-header-only h2 {
+      margin: 0 0 4px 0 !important;
+      font-size: 20pt !important;
+      line-height: 1.15 !important;
+    }
+
+    .print-logo {
+      max-width: 150px !important;
+      margin-bottom: 8px !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [8] Cabeçalho visual da tela
+    ---------------------------------------------------------------- */
+    h2 {
+      font-size: 19pt !important;
+      margin: 0 0 4px 0 !important;
+      line-height: 1.15 !important;
+    }
+
+    #headMeta {
+      font-size: 11pt !important;
+      margin-top: 4px !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [9] Seções do relatório
+    ---------------------------------------------------------------- */
+    .section-box {
+      width: 100% !important;
+      background: #fff !important;
+      border: 1px solid #bfbfbf !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      margin: 0 0 10px 0 !important;
+      padding: 10px 12px !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+
+    .section-title {
+      margin: 0 0 8px 0 !important;
+      padding-bottom: 4px !important;
+      font-size: 13pt !important;
+      font-weight: 700 !important;
+      color: #000 !important;
+      border-bottom: 1px solid #bfbfbf !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [10] Conteúdo geral
+    ---------------------------------------------------------------- */
+    .kv-grid {
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 10px 14px !important;
+      width: 100% !important;
+    }
+
+    .kv-item,
+    #dadosGerais,
+    #hipotBox,
+    #bancadasBox,
+    #checklistBox,
+    .muted,
+    .exec-box,
+    .check-desc,
+    .check-meta {
+      font-size: 11pt !important;
+      line-height: 1.35 !important;
+    }
+
+    .kv-item strong {
+      font-size: 11pt !important;
+      margin-bottom: 2px !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [11] Chips
+    ---------------------------------------------------------------- */
+    .chip {
+      display: inline-block !important;
+      font-size: 10pt !important;
+      padding: 3px 8px !important;
+      border-radius: 12px !important;
+      border: 1px solid #888 !important;
+      font-weight: 700 !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [12] Timeline
+    ---------------------------------------------------------------- */
+    .timeline-item {
+      position: relative !important;
+      padding-left: 14px !important;
+      margin-bottom: 8px !important;
+      border-left: 2px solid #999 !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      font-size: 11pt !important;
+      width: 100% !important;
+    }
+
+    .timeline-item::before {
+      left: -4px !important;
+      top: 5px !important;
+      width: 6px !important;
+      height: 6px !important;
+      background: #666 !important;
+    }
+
+    .timeline-item.active {
+      border-left-color: #000 !important;
+    }
+
+    .timeline-item.active::before {
+      background: #000 !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [13] Checklist
+    ---------------------------------------------------------------- */
+    .check-item {
+      display: flex !important;
+      gap: 8px !important;
+      padding: 6px 0 !important;
+      border-bottom: 1px solid #ddd !important;
+      align-items: flex-start !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      width: 100% !important;
+    }
+
+    .check-item:last-child {
+      border-bottom: none !important;
+    }
+
+    .check-ordem {
+      width: 24px !important;
+      font-size: 10pt !important;
+      font-weight: 700 !important;
+      margin-top: 1px !important;
+      flex: 0 0 24px !important;
+    }
+
+    .check-content {
+      flex: 1 !important;
+    }
+
+    .check-status {
+      width: 110px !important;
+      text-align: right !important;
+      font-size: 10pt !important;
+      flex: 0 0 110px !important;
+    }
+
+    .exec-box {
+      border: 1px solid #bfbfbf !important;
+      border-radius: 0 !important;
+      padding: 8px !important;
+      margin-bottom: 8px !important;
+      background: #fff !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      width: 100% !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [14] Detalhes abertos no papel
+    ---------------------------------------------------------------- */
+    details {
+      display: block !important;
+    }
+
+    details summary {
+      display: none !important;
+    }
+
+    details[open] summary {
+      display: none !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [15] Regra extra para o histórico de bancadas
+    ---------------------------------------------------------------- */
+    #bancadasBoxSection {
+      break-before: auto !important;
+      page-break-before: auto !important;
+    }
+  }
+
+  /* Classe auxiliar para logo que só aparece na impressão */
+  .print-header-only { display: none; }
+
+  /* Estilos para Checklist Nível C */
+  .check-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; align-items: flex-start; }
+  .check-item:last-child { border-bottom: none; }
+  .check-ordem { width: 24px; font-weight: 700; color: #94a3b8; font-size: 0.8rem; margin-top: 2px; }
+  .check-content { flex: 1; }
+  .check-desc { font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+  .check-meta { font-size: 0.8rem; color: #64748b; }
+  .check-status { width: 110px; text-align: right; }
+  .exec-box { border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin-bottom: 10px; background: #fff; }
+</style>
+
+<div class="card card-trace">
+
+  <nav aria-label="breadcrumb" style="margin:-6px 0 14px 0; font-size:14px;">
+    <a href="{{ url_for('gp_setup_bp.page_setup_home') }}">Home</a>
+    <span class="muted">›</span>
+    <a href="{{ url_for('gp_rastreabilidade_bp.rastreabilidade_home') }}">Produção · Rastreabilidade</a>
+    <span class="muted">›</span>
+    <span class="muted">Serial {{ serial }}</span>
+  </nav>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap; margin-bottom: 20px;">
+    <div>
+      <h2 style="margin:0; font-size: 1.8rem;">Relatório de Rastreabilidade</h2>
+      <div style="margin-top:4px;color:#64748b;">
+        Nº Série: <span style="font-family:monospace; font-size: 1.2em; color: #000;">{{ serial }}</span>
+      </div>
+      <div id="headMeta" style="margin-top:6px; font-size: 0.9rem;">Carregando...</div>
+    </div>
+    <div class="no-print" style="display:flex;gap:8px;align-items:center;">
+      <button onclick="window.print()" class="btn" style="background: #475569; color: white; border: none;">
+        🖨️ Imprimir Relatório
+      </button>
+      <a class="btn outline" href="{{ url_for('gp_rastreabilidade_bp.rastreabilidade_home') }}">Voltar</a>
+    </div>
+  </div>
+  
+  <div class="print-header-only">
+      <h2 style="margin:0;">Relatório de Produção e Qualidade</h2>
+      <div style="margin-top:5px;">Serial: <strong>{{ serial }}</strong></div>
+      <div style="font-size: 0.8rem; margin-top: 5px;">Gerado em: <span id="printDate"></span></div>
+  </div>
+
+  <hr class="no-print" style="margin:0 0 20px; border: 0; border-top: 1px solid #e2e8f0;">
+
+  <section class="section-box">
+    <h3 class="section-title">📦 Dados Gerais de Produção</h3>
+    <div id="dadosGerais" class="kv-grid muted">Carregando...</div>
+  </section>
+
+  <section class="section-box">
+    <h3 class="section-title">⚡ Ensaio Elétrico (Hi-Pot)</h3>
+    <div id="hipotBox" class="muted">Carregando...</div>
+  </section>
+
+  <section class="section-box" id="bancadasBoxSection">
+    <h3 class="section-title">⏱️ Histórico de Bancadas (Timeline)</h3>
+    <div id="bancadasBox" class="muted">Carregando...</div>
+  </section>
+
+  <section class="section-box">
+    <h3 class="section-title">🔎 CHECKLIST DE QUALIDADE – BANCADA 8</h3>
+    <div id="checklistBox" class="muted">Carregando...</div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  const serial = "{{ serial }}";
+  const headMeta = document.getElementById('headMeta');
+  const dadosGerais = document.getElementById('dadosGerais');
+  const bancadasBox = document.getElementById('bancadasBox');
+  const hipotBox = document.getElementById('hipotBox');
+  const checklistBox = document.getElementById('checklistBox');
+  
+  // Data de impressão
+  const now = new Date();
+  document.getElementById('printDate').textContent = now.toLocaleString();
+
+  function fmt(iso){
+    if(!iso) return '-';
+    try{
+      const d = new Date(iso);
+      const p = n => String(n).padStart(2,'0');
+      return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    }catch(e){ return iso; }
+  }
+
+  function chip(label, cls){
+    return `<span class="chip ${cls||'neutral'}">${label}</span>`;
+  }
+
+  function statusLabel(st){
+    const s = (st||'').toLowerCase();
+    if(s==='done' || s==='ok' || s==='apr' || s==='aprovado') return chip('APROVADO','success');
+    if(s==='in_progress') return chip('EM ANDAMENTO','warning');
+    if(s==='queued') return chip('EM FILA','neutral');
+    if(s==='reprovado' || s==='rejected' || s==='rep' || s==='fail') return chip('REPROVADO','danger');
+    if(s==='retrabalho' || s==='rework') return chip('RETRABALHO','warning');
+    if(s==='não informado' || s==='nao informado') return chip('NÃO INFORMADO','neutral');
+    return chip(st||'-','neutral');
+  }
+
+  async function load(){
+    try{
+      const resp = await fetch(`/producao/gp/rastreabilidade/api/${encodeURIComponent(serial)}`);
+      const json = await resp.json();
+      if(!json.ok) throw new Error(json.error || 'Erro na API');
+
+      const d = json.data || {};
+
+      // Cabeçalho meta
+      headMeta.innerHTML = `
+        <strong>Modelo:</strong> ${d.modelo||'-'} &nbsp;•&nbsp;
+        <strong>Status Atual:</strong> ${statusLabel(d.status_atual)} &nbsp;•&nbsp;
+        <strong>Duração Total:</strong> ${d.duracao_min ?? '-'} min
+      `;
+
+      // Dados gerais
+      dadosGerais.innerHTML = `
+        <div class="kv-item"><strong>Início da Produção</strong>${fmt(d.started_at)}</div>
+        <div class="kv-item"><strong>Fim da Produção</strong>${fmt(d.finished_at)}</div>
+        <div class="kv-item"><strong>Tempo Total</strong>${d.duracao_min ?? '-'} min</div>
+        <div class="kv-item"><strong>Status</strong>${statusLabel(d.status)}</div>
+      `;
+
+      // Bancadas (Timeline)
+      if(!d.bancadas || d.bancadas.length===0){
+        bancadasBox.innerHTML = `<div class="muted">Sem registros de bancadas (ainda) para este serial.</div>`;
+      }else{
+        const list = d.bancadas.map(b => {
+          const oc = (b.ocorrencias||[]).length ? ` <span style="color:#ef4444">• ${b.ocorrencias.length} Ocorrência(s)</span>` : '';
+          return `
+            <div class="timeline-item ${b.fim ? '' : 'active'}">
+              <div style="font-weight:700; color:#1e293b;">${b.nome || ('Bancada ' + (b.bench_id||''))}</div>
+              <div style="font-size:0.85rem; color:#64748b;">
+                Início: ${fmt(b.inicio)} • Fim: ${fmt(b.fim)} • <strong>${b.duracao_min ?? '-'} min</strong>
+              </div>
+              <div style="font-size:0.85rem; color:#475569; margin-top:2px;">
+                Responsável: ${b.responsavel || '-'} ${oc}
+              </div>
+            </div>
+          `;
+        }).join('');
+        bancadasBox.innerHTML = `<div style="margin-top:10px;">${list}</div>`;
+      }
+
+      // Hi-Pot
+      if(!d.hipot || !d.hipot.executado){
+        hipotBox.innerHTML = `<div class="muted">Nenhum ensaio elétrico registrado.</div>`;
+      }else{
+        const h = d.hipot;
+        hipotBox.innerHTML = `
+          <div class="kv-grid">
+            <div class="kv-item"><strong>Equipamento</strong>${h.equipamento || '-'}</div>
+            <div class="kv-item"><strong>Calibração</strong>${h.calibracao || '-'}</div>
+            <div class="kv-item"><strong>Resultado Final</strong>${statusLabel(h.resultado_final)}</div>
+          </div>
+          <div style="margin-top:12px; display:flex; gap:20px; flex-wrap:wrap; background:#f8fafc; padding:10px; border-radius:8px;">
+            <div><strong>GB:</strong> ${h.gb1?.valor || '-'} ${statusLabel(h.gb1?.status)}</div>
+            <div><strong>HP:</strong> ${h.hp1?.valor || '-'} ${statusLabel(h.hp1?.status)}</div>
+          </div>
+          ${h.observacao_reprovacao ? `<div style="margin-top:10px; color:#b91c1c; font-size:0.85rem;"><strong>Obs:</strong> ${h.observacao_reprovacao}</div>` : ''}
+        `;
+      }
+
+      // Checklist (Nível C — Bancada 8)
+      const c8 = d.checklist_b8;
+      if(!c8 || !c8.executado){
+        checklistBox.innerHTML = `<div class="muted">Nenhum checklist de qualidade registrado para a Bancada 8.</div>`;
+      }else{
+        const latest = c8.latest || {};
+        const execs = c8.executions || [];
+        
+        const header = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="font-size:0.9rem; color:#64748b;">Última Inspeção por: <strong>${latest.operador || '-'}</strong></div>
+              <div style="font-size:0.8rem; color:#94a3b8;">Início: ${fmt(latest.started_at)} • Fim: ${fmt(latest.finished_at)} • Duração: <strong>${latest.duracao_min ?? '-'} min</strong></div>
+            </div>
+            <div>${statusLabel(latest.resultado_final)}</div>
+          </div>
+        `;
+
+        const itemsHtml = (latest.itens || []).map(it => {
+          const obs = it.observacao ? `<div class="check-meta" style="color:#475569; margin-top:4px;">📝 <strong>Obs:</strong> ${it.observacao}</div>` : '';
+          const ncrs = (it.ncrs || []).map(n => `<div class="check-meta" style="color:#b91c1c; margin-top:2px;">⚠️ <strong>NCR:</strong> ${n.descricao || n.texto || n}</div>`).join('');
+          
+          return `
+            <div class="check-item">
+              <div class="check-ordem">${it.ordem || ''}</div>
+              <div class="check-content">
+                <div class="check-desc">${it.desc || it.descricao || '-'}</div>
+                ${obs}
+                ${ncrs}
+              </div>
+              <div class="check-status">${statusLabel(it.status)}</div>
+            </div>
+          `;
+        }).join('');
+
+        let historyHtml = '';
+        if(execs.length > 1){
+          historyHtml = `
+            <details class="no-print" style="margin-top:20px; border-top:1px dashed #cbd5e1; padding-top:15px;">
+              <summary style="cursor:pointer; color:#3b82f6; font-weight:600; font-size:0.9rem;">Ver histórico de reexecuções (${execs.length - 1})</summary>
+              ${execs.slice(0, -1).reverse().map((ex, idx) => {
+                const exItems = (ex.itens || []).map(it => `
+                  <div style="font-size:0.8rem; padding:4px 0; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between;">
+                    <span>${it.ordem}. ${it.desc || it.descricao}</span>
+                    <span>${statusLabel(it.status)}</span>
+                  </div>
+                `).join('');
+
+                return `
+                  <div class="exec-box" style="margin-top:10px;">
+                    <div style="display:flex; gap:10px; justify-content:space-between; flex-wrap:wrap;">
+                      <div><strong>Execução</strong> #${execs.length - (idx + 1)}</div>
+                      <div><strong>Resultado</strong> ${statusLabel(ex.resultado_final)}</div>
+                    </div>
+                    <div class="muted" style="margin-top:6px; font-size:0.85rem;">
+                      Operador: <strong>${ex.operador || '-'}</strong> • Início: ${fmt(ex.started_at)} • Fim: ${fmt(ex.finished_at)} • Duração: <strong>${ex.duracao_min ?? '-'} min</strong>
+                    </div>
+                    <div style="margin-top:10px;">${exItems || '<div class="muted">Sem itens.</div>'}</div>
+                  </div>
+                `;
+              }).join('')}
+            </details>
+          `;
+        }
+
+        checklistBox.innerHTML = `
+          ${header}
+          <div style="background:#f8fafc; padding:10px; border-radius:8px;">${itemsHtml || '<div class="muted">Sem itens registrados.</div>'}</div>
+          ${historyHtml}
+        `;
+      }
+
+    }catch(e){
+      console.error(e);
+      headMeta.innerHTML = `<span style="color:#ef4444">Erro ao carregar dados: ${e.message}</span>`;
+    }
+  }
+
+  load();
+})();
+</script>
+{% endblock %}

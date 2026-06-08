@@ -1,0 +1,261 @@
+{% extends "_base.html" %}
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
+{% block title %}Estoque — Pneumark SGP{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_module_name
+[RESPONSABILIDADE] Definir o nome do módulo exibido no cabeçalho/layout
+==================================================================== -->
+{% block module_name %}Módulo de Estoque{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_module_name
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Prefetch de rotas do módulo Estoque + estilos da subnav e ajustes de layout
+==================================================================== -->
+{% block head_extra %}
+  <link rel="prefetch" href="/cadastrar_peca">
+  <link rel="prefetch" href="/listar_pecas">
+  <link rel="prefetch" href="{{ url_for('cadastrar_fornecedor_bp.cadastrar_fornecedor') }}">
+  <link rel="prefetch" href="/relatorios_estoque">
+
+  <style>
+    /* Ajustes específicos para a Grid colada no topo */
+    main.container {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      padding-top: 10px;
+    }
+
+    .toolbar { margin-bottom: 10px; }
+    #cardsGrid { margin-top: 0; align-content: start; }
+
+    /* Subnav local do módulo Estoque */
+    .subnav { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 14px 0; }
+    .subnav a {
+      color: #324255; text-decoration: none; font-weight: 700; font-size: 13px;
+      padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border);
+      background: #fff;
+      transition: .2s var(--easing);
+    }
+    .subnav a:hover { background: #ffe9e9; border-color: #ffb3b3; }
+    .subnav a.active {
+      color: #0e1a2b;
+      background: linear-gradient(180deg, #ffd9d9, #ffc7c7);
+      border-color: #ffb3b3;
+      box-shadow: 0 0 0 6px rgba(230,0,0,0.10);
+    }
+  </style>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar toolbar, subnav e cards de navegação do módulo Estoque
+==================================================================== -->
+{% block content %}
+  <div class="toolbar">
+    <div class="breadcrumb" aria-label="Você está em">
+      <a href="/">Módulos</a> &nbsp;/&nbsp; <strong>Estoque</strong>
+    </div>
+
+    <label class="searchbar" for="filtro" title="Atalho: pressione / para focar" aria-label="Buscar cards">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <input id="filtro" type="text" placeholder="Filtrar (ex.: cadastrar, peças, omie...)" autocomplete="off"/>
+    </label>
+  </div>
+
+  <nav class="subnav" aria-label="Atalhos do módulo Estoque">
+    <a href="/cadastrar_peca" class="{% if request.path == '/cadastrar_peca' %}active{% endif %}">
+      <i class="fa-solid fa-cubes"></i> &nbsp;Cadastrar Peça
+    </a>
+    <a href="/listar_pecas" class="{% if request.path == '/listar_pecas' %}active{% endif %}">
+      <i class="fa-solid fa-list"></i> &nbsp;Listar Peças
+    </a>
+    <a href="/relatorios_estoque" class="{% if request.path == '/relatorios_estoque' %}active{% endif %}">
+      <i class="fa-solid fa-chart-column"></i> &nbsp;Relatórios
+    </a>
+    <a href="{{ url_for('cadastrar_fornecedor_bp.cadastrar_fornecedor') }}" 
+       class="{% if request.endpoint == 'cadastrar_fornecedor_bp.cadastrar_fornecedor' %}active{% endif %}">
+      <i class="fa-solid fa-handshake"></i> &nbsp;Fornecedores
+    </a>
+  </nav>
+
+  <section class="grid" id="cardsGrid">
+    <a class="card navlink" href="/cadastrar_peca" data-title="cadastrar peça estoque novo item" data-index="1" tabindex="0" role="link">
+      <span class="kbd-hint">1</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-cubes"></i></div>
+      <h3>Cadastrar Peça</h3>
+      <p>Nova peça no catálogo e estrutura.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <a class="card navlink" href="/listar_pecas" data-title="listar peças consulta estoque manutenção" data-index="2" tabindex="0" role="link">
+      <span class="kbd-hint">2</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-list"></i></div>
+      <h3>Listar Peças</h3>
+      <p>Consulta e manutenção de itens.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <a class="card navlink" href="#" data-title="omie integração api estoque compras notas fiscais" data-index="3" tabindex="0" role="link">
+      <span class="kbd-hint">3</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-right-left"></i></div>
+      <h3>Comunicação com OMIE</h3>
+      <p>Comunicações via API do OMIE.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <a class="card navlink" href="/saida_manual" data-title="relatórios exportação análises" data-index="4" tabindex="0" role="link">
+      <span class="kbd-hint">4</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-file-lines"></i></div>
+      <h3>Relatórios</h3>
+      <p>Exportações e análises pontuais.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <a class="card navlink" href="{{ url_for('cadastrar_fornecedor_bp.cadastrar_fornecedor') }}" data-title="cadastrar fornecedores parceiros manutenção" data-index="5" tabindex="0" role="link">
+      <span class="kbd-hint">5</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-handshake"></i></div>
+      <h3>Fornecedores</h3>
+      <p>Cadastro e manutenção de parceiros.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <a class="card navlink" href="#" data-title="livre" data-index="6" tabindex="0" role="link">
+      <span class="kbd-hint">6</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-boxes-stacked"></i></div>
+      <h3>LIVRE</h3>
+      <p>Espaço reservado para função futura.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+  </section>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_scripts
+[RESPONSABILIDADE] Implementar filtro, ripple, navegação via routeTo e atalhos de teclado (/, 1–9)
+==================================================================== -->
+{% block scripts %}
+<script>
+  const filtro = document.getElementById('filtro');
+  const grid = document.getElementById('cardsGrid');
+  let timer;
+
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] applyFilter
+  // [RESPONSABILIDADE] Filtrar cards por texto (data-title + h3) no cliente
+  // ====================================================================
+  function applyFilter(){
+    const q = (filtro.value || '').toLowerCase().trim();
+    [...grid.querySelectorAll('.card')].forEach(card=>{
+      const txt = (card.getAttribute('data-title')||'') + ' ' + (card.querySelector('h3')?.innerText||'').toLowerCase();
+      card.style.display = txt.includes(q)? '':'none';
+    });
+  }
+  // ====================================================================
+  // [FIM BLOCO] applyFilter
+  // ====================================================================
+
+  filtro?.addEventListener('input', ()=>{
+    clearTimeout(timer); timer = setTimeout(applyFilter, 80);
+  });
+
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] addRipple
+  // [RESPONSABILIDADE] Criar efeito ripple no ponto do clique (ou centralizado via teclado)
+  // ====================================================================
+  function addRipple(target, evt){
+    const rect = target.getBoundingClientRect();
+    const cx = evt && typeof evt.clientX === 'number' ? evt.clientX - rect.left : rect.width/2;
+    const cy = evt && typeof evt.clientY === 'number' ? evt.clientY - rect.top  : rect.height/2;
+    const r = document.createElement('span');
+    r.className = 'ripple';
+    r.style.left = (cx-10)+'px';
+    r.style.top = (cy-10)+'px';
+    r.style.width = r.style.height = '20px';
+    target.appendChild(r);
+    setTimeout(()=> r.remove(), 600);
+  }
+  // ====================================================================
+  // [FIM BLOCO] addRipple
+  // ====================================================================
+
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] simulateClick
+  // [RESPONSABILIDADE] Simular acionamento do card via teclado (atalhos 1–9)
+  // ====================================================================
+  function simulateClick(el){
+    const href = el.getAttribute('href');
+    if (!href || href === '#') return;
+    addRipple(el, null);
+    routeTo(href);
+  }
+  // ====================================================================
+  // [FIM BLOCO] simulateClick
+  // ====================================================================
+
+  // Ripple + Navegação (usa routeTo da base)
+  grid?.querySelectorAll('.navlink').forEach(link=>{
+    link.addEventListener('click', (e)=>{
+      const href = link.getAttribute('href');
+      if(href && href !== '#') {
+        e.preventDefault();
+        addRipple(link, e);
+        routeTo(href);
+      }
+    });
+  });
+
+  // Atalhos de teclado
+  window.addEventListener('keydown', (e)=>{
+    if (e.key === '/' && document.activeElement !== filtro){
+      e.preventDefault(); filtro?.focus();
+    }
+    if (/^[1-9]$/.test(e.key)){
+      const n = Number(e.key);
+      const visibles = [...grid.querySelectorAll('.card')].filter(el=> el.style.display !== 'none');
+      if (visibles[n-1]) simulateClick(visibles[n-1]);
+    }
+  });
+</script>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_scripts
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_module_name
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_content
+DOCUMENTO_HTML: block_scripts
+FUNÇÃO: applyFilter
+FUNÇÃO: addRipple
+FUNÇÃO: simulateClick
+==================================================================== -->

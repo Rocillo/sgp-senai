@@ -1,0 +1,255 @@
+{% extends "_base.html" %}
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
+{% block title %}Compras — Pneumark SGP{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_module_name
+[RESPONSABILIDADE] Definir o nome do módulo exibido no cabeçalho/layout
+==================================================================== -->
+{% block module_name %}Módulo de Compras{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_module_name
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Prefetch de rotas do módulo Compras + estilos da subnav e ajustes de layout
+==================================================================== -->
+{% block head_extra %}
+  <link rel="prefetch" href="{{ url_for('requisicoes.listar_requisicoes') }}">
+  <link rel="prefetch" href="{{ url_for('compras_bp.manual_do_fornecedor') }}">
+
+  <style>
+    main.container {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      padding-top: 10px;
+    }
+
+    .toolbar { margin-bottom: 10px; }
+    #cardsGrid { margin-top: 0; align-content: start; }
+
+    .subnav { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 14px 0; }
+    .subnav a {
+      color: #324255; text-decoration: none; font-weight: 700; font-size: 13px;
+      padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border);
+      background: #fff;
+      transition: .2s var(--easing);
+    }
+    .subnav a:hover { background: #ffe9e9; border-color: #ffb3b3; }
+    .subnav a.active {
+      color: #0e1a2b;
+      background: linear-gradient(180deg, #ffd9d9, #ffc7c7);
+      border-color: #ffb3b3;
+      box-shadow: 0 0 0 6px rgba(230,0,0,0.10);
+    }
+  </style>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar toolbar, subnav e cards de navegação do módulo Compras
+==================================================================== -->
+{% block content %}
+  <div class="toolbar">
+    <div class="breadcrumb" aria-label="Você está em">
+      <a href="/">Módulos</a> &nbsp;/&nbsp; <strong>Compras</strong>
+    </div>
+
+    <label class="searchbar" for="filtro" title="Atalho: pressione / para focar" aria-label="Buscar cards">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <input id="filtro" type="text" placeholder="Filtrar (ex.: requisição, fornecedor, cotação...)" autocomplete="off"/>
+    </label>
+  </div>
+
+    <nav class="subnav" aria-label="Atalhos do módulo Compras">
+    <a href="{{ url_for('requisicoes.listar_requisicoes') }}"
+       class="{% if request.endpoint == 'requisicoes.listar_requisicoes' %}active{% endif %}">
+      <i class="fa-solid fa-file-signature"></i> &nbsp;Requisições
+    </a>
+
+    <a href="#" class="">
+      <i class="fa-solid fa-handshake"></i> &nbsp;Fornecedores
+    </a>
+
+    <a href="{{ url_for('compras_bp.manual_do_fornecedor') }}"
+       class="{% if request.endpoint == 'compras_bp.manual_do_fornecedor' %}active{% endif %}">
+      <i class="fa-solid fa-book"></i> &nbsp;Manual
+    </a>
+
+    <a href="#" class="">
+      <i class="fa-solid fa-scale-balanced"></i> &nbsp;Cotações
+    </a>
+
+    <a href="#" class="">
+      <i class="fa-solid fa-cart-shopping"></i> &nbsp;Pedidos
+    </a>
+  </nav>
+
+  <section class="grid" id="cardsGrid">
+    <a class="card navlink" href="{{ url_for('requisicoes.listar_requisicoes') }}" data-title="requisições compras solicitação interna materiais serviços" data-index="1" tabindex="0" role="link">
+      <span class="kbd-hint">1</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-file-signature"></i></div>
+      <h3>Requisições de Compras</h3>
+      <p>Solicitações internas de materiais e serviços.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <a class="card navlink" href="#" data-title="fornecedores homologados aprovados cadastro controle" data-index="2" tabindex="0" role="link">
+      <span class="kbd-hint">2</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-handshake"></i></div>
+      <h3>Fornecedores Homologados</h3>
+      <p>Cadastro e controle de fornecedores aprovados.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <a class="card navlink" href="{{ url_for('compras_bp.manual_do_fornecedor') }}" data-title="manual fornecedor requisitos orientações qualidade iso 9001" data-index="3" tabindex="0" role="link">
+      <span class="kbd-hint">3</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-book"></i></div>
+      <h3>Manual do Fornecedor</h3>
+      <p>Requisitos e orientações para fornecimento.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <a class="card navlink" href="#" data-title="cotações compras preços comparativos fornecedores" data-index="4" tabindex="0" role="link">
+      <span class="kbd-hint">4</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-scale-balanced"></i></div>
+      <h3>Cotações</h3>
+      <p>Solicitações e comparativos de preços.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <a class="card navlink" href="#" data-title="pedidos compra emissão acompanhamento" data-index="5" tabindex="0" role="link">
+      <span class="kbd-hint">5</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-cart-shopping"></i></div>
+      <h3>Pedidos de Compra</h3>
+      <p>Emissão e acompanhamento de pedidos.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <a class="card navlink" href="#" data-title="avaliação fornecedores desempenho conformidade qualidade iso" data-index="6" tabindex="0" role="link">
+      <span class="kbd-hint">6</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-chart-line"></i></div>
+      <h3>Avaliação de Fornecedores</h3>
+      <p>Indicadores de desempenho e conformidade.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <a class="card navlink" href="#" data-title="livre função futura compras" data-index="7" tabindex="0" role="link">
+      <span class="kbd-hint">7</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-boxes-stacked"></i></div>
+      <h3>LIVRE</h3>
+      <p>Espaço reservado para função futura.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <a class="card navlink" href="#" data-title="livre função futura compras" data-index="8" tabindex="0" role="link">
+      <span class="kbd-hint">8</span>
+      <div class="medal" aria-hidden="true"><i class="fa fa-boxes-stacked"></i></div>
+      <h3>LIVRE</h3>
+      <p>Espaço reservado para função futura.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+  </section>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_scripts
+[RESPONSABILIDADE] Implementar filtro, ripple, navegação via routeTo e atalhos de teclado (/, 1–9)
+==================================================================== -->
+{% block scripts %}
+<script>
+  const filtro = document.getElementById('filtro');
+  const grid = document.getElementById('cardsGrid');
+  let timer;
+
+  function applyFilter(){
+    const q = (filtro.value || '').toLowerCase().trim();
+    [...grid.querySelectorAll('.card')].forEach(card=>{
+      const txt = (card.getAttribute('data-title')||'') + ' ' + (card.querySelector('h3')?.innerText||'').toLowerCase();
+      card.style.display = txt.includes(q)? '':'none';
+    });
+  }
+
+  filtro?.addEventListener('input', ()=>{
+    clearTimeout(timer); timer = setTimeout(applyFilter, 80);
+  });
+
+  function addRipple(target, evt){
+    const rect = target.getBoundingClientRect();
+    const cx = evt && typeof evt.clientX === 'number' ? evt.clientX - rect.left : rect.width/2;
+    const cy = evt && typeof evt.clientY === 'number' ? evt.clientY - rect.top  : rect.height/2;
+    const r = document.createElement('span');
+    r.className = 'ripple';
+    r.style.left = (cx-10)+'px';
+    r.style.top = (cy-10)+'px';
+    r.style.width = r.style.height = '20px';
+    target.appendChild(r);
+    setTimeout(()=> r.remove(), 600);
+  }
+
+  function simulateClick(el){
+    const href = el.getAttribute('href');
+    if (!href || href === '#') return;
+    addRipple(el, null);
+    routeTo(href);
+  }
+
+  grid?.querySelectorAll('.navlink').forEach(link=>{
+    link.addEventListener('click', (e)=>{
+      const href = link.getAttribute('href');
+      if(href && href !== '#') {
+        e.preventDefault();
+        addRipple(link, e);
+        routeTo(href);
+      }
+    });
+  });
+
+  window.addEventListener('keydown', (e)=>{
+    if (e.key === '/' && document.activeElement !== filtro){
+      e.preventDefault(); filtro?.focus();
+    }
+    if (/^[1-9]$/.test(e.key)){
+      const n = Number(e.key);
+      const visibles = [...grid.querySelectorAll('.card')].filter(el=> el.style.display !== 'none');
+      if (visibles[n-1]) simulateClick(visibles[n-1]);
+    }
+  });
+</script>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_scripts
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_module_name
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_content
+DOCUMENTO_HTML: block_scripts
+FUNÇÃO: applyFilter
+FUNÇÃO: addRipple
+FUNÇÃO: simulateClick
+==================================================================== -->

@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+venv/
+.venv/
+
+# Environment / Instance
+instance/
+
+# Logs / Temp
+logs/
+tmp/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# VSCode
+.vscode/
+
+# Large file
+tree.txt
+senha do banco de dados e variaveis de ambiente.txt
+
+# Labels / QRCode gerados
+app/static/labels/
+app/static/qrcodes/
+
+# Backups locais
+bkp-BancoDeDados_Diario/
+backup_sgp.ps1
+
+# Bancos e dumps locais
+*.dump
+*.db
+*.sqlite
+*.sqlite3

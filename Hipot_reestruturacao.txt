@@ -1,0 +1,537 @@
+# Relatório técnico de integração SGP e HIPOT
+
+## Resumo executivo
+
+A inspeção direta dos dois ZIPs mostra que você já tem **duas metades do sistema**: o **SGP** como núcleo web em Flask, com módulo de produção, painel, rastreabilidade e um esqueleto de integração HiPot; e o **HIPOT** como aplicação desktop em Python/PySide6, conectada à porta serial, com banco SQLite local e histórico de ensaios. O melhor uso das **80 horas do SENAI** não é reescrever tudo do desktop para navegador agora. O melhor retorno é **transformar o HIPOT em um agente fino de coleta/sincronização para o SGP**, deixando o **SGP como sistema central** e o **agente Windows** responsável apenas por serial, fila offline e envio confiável. Isso reduz risco, respeita a realidade do hardware na bancada e aproveita o que já existe em ambos os projetos. Essa direção é coerente com a arquitetura modular do Flask por application factory e blueprints, com o uso formal de migrações via Flask-Migrate/Alembic, e com o empacotamento do cliente desktop via PyInstaller/Qt for Python. citeturn6view1turn6view2turn6view9turn6view3turn6view4turn6view5
+
+O ponto mais crítico encontrado é que a **integração automática atual do SGP para HiPot está incompleta e inconsistente**. O SGP já tem rotas e serviço de HiPot, mas o caminho automático hoje passa por um script PowerShell separado e por um endpoint `/producao/gp/hipot/api/result` que, pelo código atual, **atualiza ordem/etapa, mas não grava as medições completas em `gp_hipot_run`**; além disso, há um **erro de contrato de retorno** entre rota e serviço, que tende a produzir resposta HTTP de erro mesmo após commit. Em paralelo, a aplicação desktop HIPOT **lê serial e grava rastreabilidade local**, mas **não sincroniza com o SGP**. Resultado: hoje você tem UI e banco local de um lado, e fluxo/kanban/rastreabilidade web do outro, mas ainda não tem um fluxo único, confiável e auditável de ponta a ponta.
+
+Em termos práticos, eu recomendaria que as 80 horas fossem usadas para quatro entregas centrais: **padronizar a API canônica de ingestão HiPot**, **sincronizar o HIPOT desktop com fila offline**, **persistir as corridas HiPot de forma estruturada no SGP**, e **fechar o ciclo no painel/rastreabilidade do SGP**. O restante das horas deve cobrir migrações, testes, empacotamento e rollback. Isso é factível dentro de 80 horas. Já uma migração total do desktop para uma interface web pura, mantendo a robustez de porta serial em bancada, é uma aposta mais arriscada para esse orçamento e prazo.
+
+## Panorama dos projetos
+
+A análise abaixo foi feita por inspeção direta dos ZIPs fornecidos nesta sessão.
+
+### Estrutura do HIPOT
+
+**Visão geral**  
+Projeto pequeno, objetivo e concentrado em uma aplicação desktop GUI. O entry point é `main.py`. O runtime observado é um **cliente PySide6** que abre uma janela, usa uma `QThread` para leitura serial e grava resultados em `hipot.db` local.
+
+| Item | Tipo | Papel | Tamanho aprox. |
+|---|---|---|---:|
+| `main.py` | arquivo | Entry point desktop (`QApplication`) | 253 B |
+| `gui.py` | arquivo | Tela principal, serial, logs, validação por S/N | 7,5 KB |
+| `serial_worker.py` | arquivo | Thread de leitura serial contínua | 4,5 KB |
+| `serial_comm.py` | arquivo | Abstração mínima de `serial.Serial` | 468 B |
+| `database.py` | arquivo | Criação e persistência em SQLite local | 1,9 KB |
+| `reports.py` | arquivo | Tela de relatórios/filtros de histórico | 6,8 KB |
+| `hipot.db` | arquivo | Banco SQLite local | 12 KB |
+| `Hipot_Pneumark_v1.spec` | arquivo | Especificação PyInstaller | 868 B |
+| `Hipot_Pneumark_v2.spec` | arquivo | Especificação PyInstaller | 868 B |
+| `icon.ico` | arquivo | Ícone do executável | 998 KB |
+| `list_ports.py` | arquivo | Diagnóstico de portas COM | 1,9 KB |
+| `operators.py` | arquivo | Lista estática de operadores | 118 B |
+| `.git` | pasta | Metadados de repositório incluídos no ZIP | 4,5 MB |
+
+**Resumo funcional do HIPOT**
+
+- **Leitura física**: porta serial hardcoded em `COM3`, `9600`.
+- **Processo operacional**: o operador precisa informar o número de série antes do teste.
+- **Persistência**: tabela local `testes_hipot` em `hipot.db`.
+- **Modelo de dados atual**: grava `data_hora`, `numero_serie`, `operador`, `resultado`, `relatorio`, `porta_com`, `baudrate`.
+- **Histórico local**: existe tela de consulta, filtro por data/status/S/N.
+- **Empacotamento**: existem dois `.spec`; portanto, há intenção clara de build como EXE com PyInstaller. O PyInstaller suporta build a partir de `.spec`, e o Qt for Python documenta compatibilidade com PyInstaller para aplicações PySide6. citeturn6view3turn6view4turn6view5
+
+### Estrutura do SGP
+
+**Visão geral**  
+Projeto Flask em formato relativamente modular, com `create_app()` e muitos blueprints. O ZIP, porém, veio carregando também muita coisa que não deveria estar no projeto distribuído: `venv`, `.git`, snapshots de banco, backups, arquivos auxiliares e segredos em texto. O Flask recomenda application factory e blueprints para aplicações maiores, e isso já aparece no projeto; o problema não é a base do Flask, e sim a maturidade operacional, a higiene de repositório e a consistência da camada HiPot. citeturn6view1turn6view2
+
+| Item | Tipo | Papel | Tamanho aprox. |
+|---|---|---|---:|
+| `app/` | pasta | Núcleo da aplicação Flask | 3,5 MB |
+| `app/__init__.py` | arquivo | Application factory, extensões, registro de blueprints | 20 KB |
+| `run.py` | arquivo | Entry point WSGI/produção local | 175 B |
+| `main.py` | arquivo | Entry point dev com `debug=True` | 145 B |
+| `requirements.txt` | arquivo | Manifesto de dependências | 1,2 KB |
+| `runtime.txt` | arquivo | Runtime Python (3.12.8) | 13 B |
+| `Procfile` | arquivo | Execução web com Gunicorn | 21 B |
+| `migrations/` | pasta | Alembic/Flask-Migrate (mais completa) | 125 KB |
+| `instance/` | pasta | SQLite local e snapshots | 1,7 MB |
+| `collector_hipot_post/` | pasta | Script PowerShell de coleta serial + POST HiPot | 11 KB |
+| `venv/` | pasta | Ambiente virtual incluído no ZIP | 55 MB |
+| `tree.txt` | arquivo | Dump de estrutura incluído no ZIP | 104,3 MB |
+| `.git/` | pasta | Metadados do repositório incluídos no ZIP | 84 MB |
+| `bkp-BancoDeDados_Diario/` | pasta | Backups locais incluídos | 1,6 MB |
+| `req.json` | arquivo | Credencial legada/OMIE em texto | 144 B |
+| `senha do banco de dados...txt` | arquivo | Segredo de banco em texto puro | 426 B |
+
+### Dependências e compatibilidade
+
+#### Inventário do HIPOT
+
+**Manifesto encontrado:** não há `requirements.txt` nem `pyproject.toml` no ZIP do HIPOT.  
+**Dependências inferidas por import direto:**
+
+| Grupo | Dependências observadas |
+|---|---|
+| GUI | `PySide6` |
+| Serial | `pyserial` (`serial`) |
+| Banco local | `sqlite3` (stdlib) |
+| Utilitários | `re`, `sys`, `time`, `datetime` |
+
+**Compatibilidade e notas**
+- O runtime é claramente desktop GUI com Qt/PySide6.
+- O acesso serial usa `pyserial`, que suporta Windows/COM e fornece ferramentas como listagem de portas e `miniterm`. citeturn7view0turn7view1turn6view7
+- Existem `.spec` de PyInstaller, então o caminho oficial de build já está indicado por design. citeturn6view3turn6view5
+- **Lacuna importante**: sem manifesto de dependências, o build não é reprodutível fora da máquina atual.
+
+#### Inventário do SGP
+
+**Manifestos encontrados**
+- `requirements.txt`
+- `runtime.txt = python-3.12.8`
+- `Procfile = web: gunicorn run:app`
+
+**Observação crítica**
+- O `requirements.txt` está em **UTF-16**. Isso não impede toda instalação, mas piora compatibilidade com tooling, diff, auditoria e CI. Vale converter para UTF-8 antes do SENAI.
+
+**Dependências do SGP por manifesto**
+
+| Grupo | Dependências |
+|---|---|
+| Web/core | Flask 3.1.2, Flask-Login 0.6.3, Flask-Migrate 4.1.0, Flask-SQLAlchemy 3.1.1, Werkzeug 3.1.5, Jinja2 3.1.6, itsdangerous 2.2.0, blinker 1.9.0, click 8.3.1 |
+| ORM/migração | SQLAlchemy 2.0.45, Alembic 1.18.1, greenlet 3.3.0 |
+| Deploy | gunicorn 25.1.0, psycopg[binary] 3.2.13 |
+| Dados/APIs | pandas 3.0.1, numpy 2.4.2, requests 2.32.5, PyJWT 2.9.0 |
+| Utilidades | qrcode 8.2, pillow 12.1.0, pyserial 3.5, python-dateutil 2.9.0.post0 |
+| Base | certifi, charset-normalizer, idna, urllib3, six, typing_extensions, tzdata, colorama |
+
+**Dependências usadas no código mas ausentes do manifesto**
+- `reportlab` — import opcional na geração de etiquetas PDF.
+- `pywin32` (`win32com`) — import opcional para Outlook/COM em serviço de e-mail.
+
+**Compatibilidade e notas**
+- O SGP usa application factory e blueprints, alinhado à abordagem recomendada pelo Flask para aplicações modulares. citeturn6view1turn6view2
+- O projeto usa Flask-Migrate/Alembic, que é o caminho correto para schema evolutivo; mas nem todo o schema real está refletido nas migrações, especialmente o ecossistema HiPot. citeturn6view9
+- O `Procfile` usa Gunicorn, o que é coerente com deploy Flask em Linux/hosting; mas Gunicorn não atende Windows nativamente, então não é solução para a máquina da bancada. Para Windows, a própria documentação Flask aponta alternativas como Waitress; no seu caso, o melhor é manter o cliente/agente no Windows e o SGP no servidor. citeturn9search1turn9search0turn9search3
+- A execução de auditoria de vulnerabilidades não foi feita pacote a pacote nesta análise; o caminho mínimo recomendado é adicionar `pip-audit` no processo. citeturn6view15
+
+### Modelo de execução do HIPOT
+
+**Conclusão sobre o runtime atual**
+- **Não é serviço/daemon**.
+- **Não é coletor HTTP nativo**.
+- **É uma aplicação desktop GUI** com PySide6.
+- **Há empacotamento pretendido em EXE** via PyInstaller (`.spec`).
+- **A automação HTTP existente não está no HIPOT desktop**; ela está em um **script PowerShell separado dentro do SGP**.
+
+**Detecção objetiva encontrada no ZIP**
+- `main.py` abre `QApplication`.
+- `gui.py` instancia `HipotWindow`.
+- `serial_worker.py` roda em `QThread` e chama `serial.Serial`.
+- `.spec` PyInstaller presentes.
+- Nenhum arquivo de serviço Windows, tarefa agendada ou agente HTTP embutido foi encontrado no ZIP do HIPOT.
+
+**Assunção explícita**
+- Assumo, com alta confiança, que o HIPOT hoje roda **como script Python local ou EXE PyInstaller gerado desses `.spec`**, operado manualmente na bancada.
+
+**Passos de detecção se você quiser validar em 2 minutos**
+```bash
+python -m serial.tools.list_ports
+pyinstaller --noconfirm --clean Hipot_Pneumark_v2.spec
+```
+
+Se o build gerar `dist/Hipot_Pneumark_v2.exe`, o runtime empacotado está confirmado. O PyInstaller documenta build por `.spec`, e o Qt for Python documenta suporte a PyInstaller para apps PySide6. citeturn6view5turn6view3turn6view4turn7view1
+
+## Integração e riscos
+
+### O que já existe de integração
+
+O módulo HiPot do SGP **já existe**, mas está em estado híbrido: parte manual, parte placeholder e parte automática incompleta. Há rotas para:
+- edição de perfil HiPot;
+- execução manual;
+- submissão via modal do painel;
+- endpoint de resultado para coletor;
+- rastreabilidade/timeline;
+- atualização de `gp_work_order` e `gp_work_stage`.
+
+Também existe um script PowerShell `collector_hipot_post.ps1` que:
+- abre porta serial;
+- parseia a etiqueta EPL;
+- resolve serial;
+- faz POST para `/producao/gp/hipot/api/result`.
+
+Ou seja: o SGP **já foi preparado para receber HiPot**, mas a espinha dorsal ainda não está fechada.
+
+### Matriz de integração
+
+| Fluxo | Situação atual | Problema | Adaptador/ação necessária |
+|---|---|---|---|
+| Equipamento HiPot → HIPOT desktop | Funciona via serial, porta hardcoded `COM3/9600` | Configuração fixa; sem reconexão robusta; sem sync web | Tela/config local + retry/reconnect + fila offline |
+| HIPOT desktop → `hipot.db` | Funciona | Banco local isolado; sem envio ao SGP | Criar sincronização HTTP assíncrona |
+| Equipamento/PowerShell → SGP `/api/result` | Existe | Endpoint atual não grava corrida completa em `gp_hipot_run`; ignora medições estruturadas | Substituir por API canônica de ingestão |
+| SGP `/api/result` → `gp_work_order`/`gp_work_stage` | Parcial | Há bug de contrato entre rota e serviço; cliente pode receber erro após commit | Corrigir assinatura/retorno e testes |
+| SGP manual (`/api/save`) → `gp_hipot_run` | Existe | Duplicação de lógica; commit transacional inconsistente | Centralizar em um service único |
+| SGP painel (`/api/painel-submit-result`) | Existe | Fluxo parcial; sem unificação com coletor automático | Reusar mesma API canônica |
+| SGP rastreabilidade → `gp_hipot_run` | Existe leitura | Tabela está vazia no snapshot analisado e alguns campos de tempo não são preenchidos | Garantir ingestão automática e timestamps |
+| HIPOT histórico local → SGP | Não existe | Histórico antigo preso no SQLite local | Importador/replay com deduplicação |
+
+### Achados críticos
+
+#### Falha estrutural da integração automática HiPot
+
+O caminho automático atual do SGP usa `collector_hipot_post.ps1` → `/producao/gp/hipot/api/result`, mas o endpoint atual:
+- **não cria `GPHipotRun`**;
+- **não persiste medições estruturadas** que o coletor já envia;
+- **atualiza ordem/etapa, mas deixa a rastreabilidade técnica incompleta**.
+
+Isso é, hoje, o principal gargalo para “virar um sistema só”.
+
+#### Bug de contrato entre rota e serviço
+
+O serviço `aplicar_resultado_hipot()` retorna um **dicionário**, mas a rota `hipot_result_apply()` tenta usar o retorno como se fosse um **objeto com atributos** (`order.serial`, `order.hipot_status`, etc.).  
+Efeito provável:
+- o serviço faz commit;
+- em seguida a rota falha;
+- o cliente recebe erro;
+- o coletor pode interpretar como falha e repetir tentativas.
+
+Isso precisa entrar no pacote da hora zero.
+
+#### Falta de autenticação na API de coleta
+
+As rotas HiPot analisadas não estão protegidas por `@login_required`, e o PowerShell até prevê um `X-Admin-PIN`, mas a rota não valida esse cabeçalho. O Flask-Login é adequado para sessão web de usuário humano, mas para máquina/coletor você precisa de autenticação própria de API. citeturn6view8
+
+#### Schema real diferente do schema versionado
+
+O banco analisado contém `gp_hipot_run`, mas **não há migração Alembic correspondente criando essa tabela** nos diretórios de migração observados. Isso significa que o schema atual depende de `create_all`, debug routes, ou ajustes manuais. Flask-Migrate/Alembic existe justamente para evitar esse desvio. citeturn6view9
+
+#### Dados de snapshot inconsistentes
+
+No `instance/pneumark.db` do ZIP analisado:
+- `gp_work_order` está vazio;
+- `gp_work_stage` tem 141 linhas órfãs.
+
+Isso não significa necessariamente que sua produção esteja assim, mas significa que o snapshot entregue no ZIP **não serve como fonte confiável de integridade referencial**.
+
+#### Placeholders e inconsistências de UI
+
+- `profile_editor.html` é placeholder.
+- `exec_manual.html` ainda se descreve como “Passo 1 — sem salvar”, mas já salva.
+- há múltiplos caminhos de gravação HiPot com lógica sobreposta.
+
+#### Risco de segurança e compliance
+
+O ZIP do SGP inclui:
+- credenciais em texto puro;
+- `req.json` com segredo;
+- banco e snapshots;
+- backups;
+- `venv`;
+- `.git`.
+
+Isso precisa ser saneado antes de qualquer trabalho externo.
+
+### Fluxo atual e fluxo recomendado
+
+```mermaid
+flowchart LR
+  subgraph Atual
+    A[Equipamento HiPot] --> B[HIPOT Desktop PySide6]
+    B --> C[(hipot.db local)]
+    A --> D[collector_hipot_post.ps1]
+    D --> E[/SGP POST /producao/gp/hipot/api/result/]
+    E --> F[(gp_work_order / gp_work_stage)]
+    E -. medições completas não persistidas .-> G[(gp_hipot_run vazio ou subutilizado)]
+  end
+
+  subgraph Alvo recomendado
+    H[Equipamento HiPot] --> I[Agente HIPOT Windows]
+    I --> J[(fila local/offline)]
+    I --> K[/SGP API canônica de ingestão HiPot/]
+    K --> L[(gp_hipot_run)]
+    K --> M[(gp_work_order / gp_work_stage)]
+    L --> N[SGP Web: painel B5]
+    L --> O[SGP Web: rastreabilidade]
+    L --> P[SGP Web: histórico e auditoria]
+    P --> Q[Perfis por modelo e limites]
+  end
+```
+
+## Escopo priorizado de 80 horas
+
+### Princípio de priorização
+
+O grande objetivo deve ser: **“o teste ocorre na bancada, o resultado entra no SGP de forma confiável, com fila offline, sem perda de medições, e aparece no painel/rastreabilidade”**.
+
+### Tabela de escopo SENAI
+
+| Tarefa | Horas | Prioridade | Risco | Critério de aceite |
+|---|---:|---|---|---|
+| API canônica de ingestão HiPot no SGP, corrigindo o endpoint atual e unificando o contrato | 14h | Muito alta | Médio | Um POST com serial + medições + status cria corrida HiPot, atualiza ordem/etapa e responde 200 consistente |
+| Migrações Alembic para o domínio HiPot e saneamento de schema | 8h | Muito alta | Médio | Banco limpo sobe do zero com migrações; nada depende de `create_all` ou rota debug |
+| Cliente de sincronização no HIPOT desktop com fila offline, retry e config de URL/token | 18h | Muito alta | Alto | Se o servidor cair, o ensaio fica em fila e sincroniza depois sem duplicar |
+| Perfil HiPot por modelo no SGP | 10h | Alta | Médio | Usuário configura limites GB/HP por modelo e essas regras passam a ser usadas na validação |
+| Integração com painel B5 e rastreabilidade web | 12h | Alta | Médio | Corrida automática aparece no kanban, no detalhe por serial e no histórico técnico |
+| Importador de histórico do `hipot.db` local para o SGP | 6h | Média | Baixo | Histórico antigo entra no SGP com deduplicação por serial/data/hash |
+| Testes automatizados e fixtures de regressão | 7h | Alta | Médio | Cobertura mínima dos fluxos críticos: ingestão, fila, painel, replay |
+| Empacotamento desktop, deploy web, documentação e rollback operacional | 5h | Alta | Baixo | EXE gerado, checklist de deploy validado e rollback documentado |
+
+**Total: 80h**
+
+### Escopo técnico recomendado
+
+#### O que deve entrar nessas 80h
+
+- **Unificar a entrada HiPot** em uma única API de negócio do SGP.
+- **Persistir corrida HiPot completa**, não só status final.
+- **Aproveitar o HIPOT desktop como agente de bancada**.
+- **Dar visibilidade web no SGP**: painel, rastreabilidade, histórico.
+- **Criar migração e replay de histórico**.
+- **Eliminar dependência de endpoints debug e acoplamentos frágeis**.
+
+#### O que eu não colocaria nessas 80h
+
+- Reescrita completa do HIPOT PySide6 em frontend web.
+- Redesign geral do SGP inteiro.
+- Refatoração ampla de todos os módulos fora do domínio HiPot.
+- Automações secundárias como e-mail/Outlook e relatórios “bonitos” antes de estabilizar ingestão.
+
+## Tarefas preparatórias antes do SENAI
+
+Estas tarefas você consegue adiantar nos próximos 20 dias e elas aumentam muito a produtividade do SENAI.
+
+### Tabela de preparação
+
+| Tarefa preparatória | Horas | Pré-requisito | Passo a passo objetivo |
+|---|---:|---|---|
+| Rotacionar segredos e tirá-los do repositório | 4h | Acesso Render/OMIE/GitHub | trocar senhas/chaves, remover `req.json` real e arquivo de senha, cadastrar secrets por ambiente |
+| Limpar repositório e criar baseline enxuta | 3h | Git | remover `venv`, `.git` do ZIP, backups, dumps, `tree.txt`; manter branch/tag “pre-senai-baseline” |
+| Coletar amostras reais do equipamento | 3h | Bancada HiPot disponível | salvar 10–20 capturas brutas do serial/etiqueta com casos APR/REP e variações |
+| Inventariar estações Windows e portas COM | 2h | Acesso às máquinas | listar PC, Windows, COM, driver USB/serial, usuário, local de instalação, impressora |
+| Definir matriz de negócio por modelo | 4h | Engenharia/qualidade | para cada modelo: limites GB/HP, responsável, bancada, obrigatoriedade, nomenclatura |
+| Preparar staging e backups | 3h | Acesso banco/host | exportar snapshot, validar restore, separar ambiente de teste |
+| Smoke build do HIPOT em Windows | 2h | Python/pyinstaller instalados | rodar build pelo `.spec`, abrir EXE, validar COM, validar histórico local |
+
+**Total estimado: 21h**
+
+### Checklist acionável para você executar já
+
+- [ ] Criar um documento simples “Matriz HiPot por Modelo” com colunas: `modelo_sgp`, `limite_gb`, `limite_hp`, `obs_obrigatoria`, `responsavel`.
+- [ ] Salvar **3 amostras aprovadas** e **3 reprovadas** do serial bruto.
+- [ ] Listar **todas as máquinas da bancada** que rodarão o agente HIPOT.
+- [ ] Validar se o serial do produto **sempre estará disponível antes do teste**.
+- [ ] Fazer backup do `hipot.db` de cada máquina real.
+- [ ] Tirar segredo e banco do Git antes de envolver terceiros.
+- [ ] Converter `requirements.txt` do SGP para UTF-8.
+- [ ] Criar uma branch limpa do trabalho: `senai/hipot-integracao`.
+
+## Implementação, testes e governança mínima
+
+### Cronograma sugerido
+
+```mermaid
+gantt
+    title Plano SENAI de 80 horas
+    dateFormat  YYYY-MM-DD
+    excludes    weekends
+
+    section Arquitetura e banco
+    Contrato canônico de ingestão HiPot      :a1, 2026-05-25, 3d
+    Migrações Alembic e schema HiPot         :a2, after a1, 2d
+
+    section Agente de bancada
+    Sync HTTP no HIPOT desktop               :b1, after a2, 4d
+    Fila offline, retry e config local       :b2, after b1, 2d
+
+    section SGP web
+    Perfil por modelo e regras               :c1, after b2, 2d
+    Painel B5 e rastreabilidade              :c2, after c1, 3d
+    Replay/importação do histórico local     :c3, after c2, 1d
+
+    section Qualidade e publicação
+    Testes automatizados e fixtures          :d1, after c3, 2d
+    Build desktop, deploy web e rollback     :d2, after d1, 1d
+```
+
+### Marcos e entregáveis
+
+| Marco | Entregável |
+|---|---|
+| Marco de contrato | Especificação única da API HiPot + payload oficial |
+| Marco de persistência | `gp_hipot_run` versionado por migração e gravando medições reais |
+| Marco de bancada | HIPOT desktop sincronizando com fila offline |
+| Marco de visibilidade | Painel B5 e rastreabilidade mostrando corridas reais |
+| Marco de publicação | EXE + deploy + rollback documentados |
+
+### Plano de testes
+
+| Camada | O que testar | Ferramenta sugerida | Critério |
+|---|---|---|---|
+| Parser/coleta | APR/REP, extração GB/HP, série ausente, ruído de porta | pytest | cada amostra gera payload esperado |
+| API HiPot | POST válido, inválido, duplicado, sem token | pytest + client Flask | respostas corretas e sem duplicidade |
+| Banco/migração | banco novo, upgrade, replay histórico | Alembic + script smoke | sobe do zero e importa histórico |
+| Fluxo de produção | atualização de `gp_work_order`, `gp_work_stage`, B5 | testes de integração | ordem evolui corretamente |
+| Offline/retentativa | servidor indisponível e retorno posterior | teste manual + fixture | fila guarda e entrega depois |
+| UI web | painel B5, detalhe por serial, histórico HiPot | smoke manual | resultado visível e coerente |
+| Hardware | cabo solto, COM errada, reconexão | bancada real | operador recebe feedback e sistema recupera |
+
+### Estratégia de rollback
+
+#### Web SGP
+- Tirar **backup do banco antes de cada migração**.
+- Publicar com **flag de recurso** para nova ingestão HiPot.
+- Se falhar:
+  - desabilitar flag;
+  - reverter para commit anterior;
+  - restaurar snapshot se a migração impactar produção.
+
+#### Desktop HIPOT
+- Manter **último EXE estável** guardado.
+- Não sobrescrever banco local sem backup.
+- Se a sincronização falhar em produção, o agente deve:
+  - continuar gravando localmente;
+  - enfileirar pendências;
+  - permitir rollback para EXE anterior sem perda do `hipot.db`.
+
+### Checklist de deploy
+
+#### Web
+- [ ] secrets configurados por ambiente
+- [ ] migração aplicada
+- [ ] endpoint de ingestão testado com payload real
+- [ ] painel B5 atualizado
+- [ ] rastreabilidade por serial validada
+- [ ] logs de erro monitorados
+
+#### Desktop
+- [ ] build via `.spec`
+- [ ] EXE abre sem instalar Python
+- [ ] URL/token configuráveis
+- [ ] teste de COM real
+- [ ] teste offline/online
+- [ ] backup do `hipot.db` anterior
+
+### Áreas e arquivos que exigem acesso do SENAI
+
+| Projeto | Arquivos/áreas | Nível de acesso |
+|---|---|---|
+| HIPOT | `main.py`, `gui.py`, `serial_worker.py`, `serial_comm.py`, `database.py`, `reports.py`, `.spec` | Escrita |
+| HIPOT | `hipot.db` de exemplo e, se possível, cópias reais anonimizadas | Leitura |
+| SGP | `app/routes/producao_routes/gerenciamento_producao_routes/hipot_routes.py` | Escrita |
+| SGP | `app/services/producao/hipot_service.py` | Escrita |
+| SGP | `app/services/producao/bench_flow_service.py` | Escrita |
+| SGP | `app/models_sqla/__init__.py` e/ou novos models dedicados | Escrita |
+| SGP | `migrations/versions/*` | Escrita |
+| SGP | `app/templates/gp_templates/hipot/*` | Escrita |
+| SGP | `app/routes/producao_routes/rastreabilidade_nserie_routes/*` | Escrita |
+| SGP | `collector_hipot_post/collector_hipot_post.ps1` | Leitura/reescrita, se mantido |
+| Infra | Render/Postgres/ambiente staging | Acesso administrativo controlado |
+| Operação | Máquina Windows da bancada, driver COM, equipamento HiPot | Acesso físico e operacional |
+
+### `.gitignore` sugerido
+
+```gitignore
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Ambientes
+.venv/
+venv/
+env/
+
+# Secrets / env
+.env
+.env.*
+req.json
+senha do banco de dados e variaveis de ambiente.txt
+
+# Bancos locais
+instance/
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+
+# Logs / temporários
+logs/
+tmp/
+*.log
+
+# Build desktop
+build/
+dist/
+
+# Artefatos gerados
+app/static/labels/
+app/static/qrcodes/
+
+# Backups locais
+bkp-BancoDeDados_Diario/
+bkp-BandoDeDados_Diario/
+
+# SO / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Dumps grandes
+tree.txt
+estrutura_projeto.txt
+estrutura_*.txt
+```
+
+### CI/CD básico recomendado
+
+O mínimo que eu colocaria em ambos os repositórios é:
+- workflow de **build e teste Python** no GitHub Actions;
+- job de **auditoria de dependências** com `pip-audit`;
+- uso de **GitHub Secrets** para chaves e URLs;
+- **Dependabot** para atualizar dependências. O GitHub documenta workflow Python, secrets e Dependabot como base recomendada. citeturn6view12turn6view13turn6view14turn6view15
+
+**Pipeline mínimo**
+1. `lint/import-smoke`
+2. `pytest`
+3. `pip-audit -r requirements.txt`
+4. build opcional do EXE HIPOT em runner Windows
+5. upload do artefato de build
+
+**Comandos úteis**
+```bash
+# Auditoria de dependências
+pip-audit -r requirements.txt
+
+# Build do HIPOT
+pyinstaller --noconfirm --clean Hipot_Pneumark_v2.spec
+
+# Listar portas seriais
+python -m serial.tools.list_ports
+```
+
+### Checklist mínimo de segurança e hardening
+
+- [ ] Remover segredos e bancos do repositório
+- [ ] Adotar token de máquina para ingestão HiPot
+- [ ] Registrar origem da corrida (`source`, `machine_id`, `received_at`)
+- [ ] Adicionar deduplicação/idempotência por hash/payload
+- [ ] Padronizar logs e evitar dados sensíveis em texto aberto
+- [ ] Cobrir migrações por Alembic, não por `create_all`
+- [ ] Separar claramente sessão web humana e autenticação de API
+- [ ] Validar payload no backend antes de atualizar ordem
+- [ ] Criar flag para desligar sincronização nova sem derrubar a bancada
+
+### Perguntas abertas e limitações
+
+- O ZIP do HIPOT **não trouxe manifesto de dependências**, então a reprodução exata do ambiente depende de inferência por imports.
+- O modo exato de execução em produção do HIPOT (script, EXE manual, inicialização automática) **não aparece configurado no ZIP**; a análise assume script/EXE manual com alta confiança.
+- Há uma **diferença de linguagem de modelo** entre o que aparece no histórico HiPot local (`HGF148` no relatório bruto) e os modelos do SGP (`PM2100`, `PM2200`, `PM700`). Para integração, a chave primária deve ser o **serial**, e não o texto do relatório.
+- O `instance/pneumark.db` do ZIP contém inconsistências referenciais; trate-o como **snapshot de trabalho**, não como verdade definitiva do ambiente produtivo.
+- Se houver exigência de “rodar tudo no navegador” na bancada, isso muda o escopo e aumenta o risco. Na configuração atual, a solução tecnicamente mais segura é **SGP web central + agente Windows de HiPot**.

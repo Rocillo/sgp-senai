@@ -1,0 +1,460 @@
+{% extends "_base.html" %}
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
+{% block title %}Módulo de Produção — Pneumark SGP{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_subtitle
+[RESPONSABILIDADE] Definir o subtítulo (linha auxiliar) exibido no layout
+==================================================================== -->
+{% block subtitle %}Módulo de Produção{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_subtitle
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Prefetch das rotas do módulo Produção + estilos locais da tela (subnav e layout)
+==================================================================== -->
+{% block head_extra %}
+  <!-- Prefetch das rotas mais acessadas para navegação instantânea -->
+  <link rel="prefetch" href="{{ url_for('maquinas_bp.pagina_montagem') }}">
+  <link rel="prefetch" href="/producao/gp/setup">
+  <link rel="prefetch" href="{{ url_for('home_producao_bp.placeholder', slug='painel-visual') }}">
+  <link rel="prefetch" href="{{ url_for('home_producao_bp.placeholder', slug='indicadores') }}">
+  <link rel="prefetch" href="{{ url_for('home_producao_bp.placeholder', slug='ordens') }}">
+  <link rel="prefetch" href="{{ url_for('home_producao_bp.placeholder', slug='relatorios') }}">
+  <link rel="prefetch" href="{{ url_for('home_producao_bp.placeholder', slug='omie') }}">
+  <link rel="prefetch" href="{{ url_for('home_producao_bp.placeholder', slug='livre') }}">
+
+  <style>
+    /* Deixa os cards colados no topo mesmo se a tela for alta */
+    main.container{
+      display:flex;
+      flex-direction:column;
+      justify-content:flex-start;
+      padding-top: 10px;
+    }
+
+    .toolbar{ margin-bottom: 10px; }
+    #cardsGrid{ margin-top:0; align-content:start; }
+
+    /* Subnav local do módulo (abaixo do breadcrumb) */
+    .subnav{ display:flex; gap:8px; flex-wrap:wrap; margin: 4px 0 14px 0; }
+    .subnav a{
+      color:#324255; text-decoration:none; font-weight:700; font-size:13px;
+      padding:8px 12px; border-radius:999px; border:1px solid var(--border);
+      background:#fff;
+      transition:.2s var(--easing);
+    }
+    .subnav a:hover{ background:#ffe9e9; border-color:#ffb3b3; }
+    .subnav a.active{
+      color:#0e1a2b;
+      background:linear-gradient(180deg, #ffd9d9, #ffc7c7);
+      border-color:#ffb3b3;
+      box-shadow: 0 0 0 6px rgba(230,0,0,.10);
+    }
+
+    /* ====================================================================
+    [BLOCO] ESTILO_LOCAL
+    [NOME] card_avisos_home_producao
+    [RESPONSABILIDADE] Estilizar card especial de avisos sem impactar os cards compartilhados
+    ==================================================================== */
+    .card-avisos{
+      position:relative;
+      overflow:hidden;
+    }
+
+    .card-avisos.is-alert{
+      border-color:#ffb3b3;
+      background:linear-gradient(180deg, #fff5f5 0%, #ffe7e7 100%);
+      box-shadow:0 14px 34px rgba(230,0,0,.14);
+    }
+
+    .card-avisos.is-alert .medal{
+      color:#b00000;
+      background:linear-gradient(180deg, #fff, #ffe3e3);
+      border-color:#ffc2c2;
+    }
+
+    .card-avisos.is-alert h3{ color:#7d0000; }
+    .card-avisos.is-alert p{ color:#7b4a4a; }
+
+    .card-avisos-badge{
+      position:absolute;
+      top:14px;
+      right:14px;
+      min-width:38px;
+      height:38px;
+      padding:0 10px;
+      border-radius:12px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      font-size:22px;
+      line-height:1;
+      border:1px solid #ffc2c2;
+      background:#fff;
+      color:#b00000;
+      box-shadow:0 8px 18px rgba(230,0,0,.12);
+    }
+
+    .card-avisos-label{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      margin-top:4px;
+      margin-bottom:6px;
+      padding:5px 9px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.03em;
+      text-transform:uppercase;
+      border:1px solid #ffd2d2;
+      color:#8a1f1f;
+      background:#fff2f2;
+    }
+
+    .card-avisos.is-ok .card-avisos-badge{
+      border-color:#d8e2ee;
+      color:#274055;
+    }
+
+    .card-avisos.is-ok .card-avisos-label{
+      border-color:#d8e2ee;
+      color:#355066;
+      background:#f6f9fc;
+    }
+    /* ====================================================================
+    [FIM BLOCO] card_avisos_home_producao
+    ==================================================================== */
+  </style>
+{% endblock %}
+
+
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar toolbar, subnav, aviso de placeholder e grid de cards (dinâmico + fallback)
+==================================================================== -->
+{% block content %}
+  <div class="toolbar">
+    <div class="breadcrumb" aria-label="Você está em">
+      <a href="{{ breadcrumb_url|default('/') }}">Módulos</a> &nbsp;/&nbsp;
+      <strong>Produção</strong>
+    </div>
+
+    <label class="searchbar" for="filtro" title="Atalho: pressione / para focar" aria-label="Buscar cards">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <input id="filtro" data-quicksearch type="text" placeholder="Filtrar (ex.: montar, painel, OP...)" autocomplete="off"/>
+    </label>
+  </div>
+
+  <!-- Subnav do módulo (opcional). Marca ativo com base no endpoint/slug -->
+  <nav class="subnav" aria-label="Atalhos do módulo Produção">
+    <a href="{{ url_for('maquinas_bp.pagina_montagem') }}"
+      class="{% if request.endpoint=='maquinas_bp.pagina_montagem' %}active{% endif %}">
+      <i class="fa-solid fa-cogs"></i> &nbsp;Montagem
+    </a>
+
+    <a href="{{ url_for('home_producao_bp.placeholder', slug='painel-visual') }}"
+      class="{% if request.endpoint=='home_producao_bp.placeholder' and request.view_args and request.view_args.get('slug')=='painel-visual' %}active{% endif %}">
+      <i class="fa-solid fa-chart-line"></i> &nbsp;Painel
+    </a>
+
+    <a href="{{ url_for('home_producao_bp.placeholder', slug='indicadores') }}"
+      class="{% if request.endpoint=='home_producao_bp.placeholder' and request.view_args and request.view_args.get('slug')=='indicadores' %}active{% endif %}">
+      <i class="fa-solid fa-gauge-high"></i> &nbsp;Indicadores
+    </a>
+
+    <a href="{{ url_for('home_producao_bp.placeholder', slug='ordens') }}"
+      class="{% if request.endpoint=='home_producao_bp.placeholder' and request.view_args and request.view_args.get('slug')=='ordens' %}active{% endif %}">
+      <i class="fa-solid fa-clipboard-list"></i> &nbsp;O.P.
+    </a>
+
+    <a href="{{ url_for('home_producao_bp.placeholder', slug='relatorios') }}"
+      class="{% if request.endpoint=='home_producao_bp.placeholder' and request.view_args and request.view_args.get('slug')=='relatorios' %}active{% endif %}">
+      <i class="fa-solid fa-file-lines"></i> &nbsp;Relatórios
+    </a>
+  </nav>
+
+  {% if placeholder %}
+    <div class="notice" role="status">{{ placeholder }}</div>
+  {% endif %}
+
+      <section class="grid" id="cardsGrid">
+    
+
+    {# ================== Cards vindos do backend ================== #}
+    {% for c in cards %}
+      <a class="card navlink"
+         href="{{ c.endpoint }}"
+         data-title="{{ c.title|lower }} {{ c.desc|lower }}"
+         data-index="{{ loop.index }}"
+         tabindex="0" role="link">
+        {% if loop.index <= 9 %}<span class="kbd-hint">{{ loop.index }}</span>{% endif %}
+        {% if c.badge %}<span class="chip">{{ c.badge }}</span>{% endif %}
+        <div class="medal" aria-hidden="true"><i class="fa {{ c.icon }}"></i></div>
+        <h3>{{ c.title }}</h3>
+        <p>{{ c.desc }}</p>
+        <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+      </a>
+    {% endfor %}
+
+    {# ================== Fallback: cards padrão se 'cards' vier vazio ================== #}
+    {% if not cards %}
+      <a class="card navlink"
+         href="{{ url_for('maquinas_bp.pagina_montagem') }}"
+         data-title="montar máquina montagem produção pm2100 pm2200 pm700"
+         data-index="1" tabindex="0" role="link" title="Abrir • atalho 1">
+        <span class="kbd-hint">1</span>
+        <span class="chip">Ativo</span>
+        <div class="medal" aria-hidden="true"><i class="fa fa-cogs"></i></div>
+        <h3>Montar Máquina</h3>
+        <p>Baixar estrutura completa do modelo e gerar seriais.</p>
+        <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+      </a>
+
+      <a class="card navlink"
+         href="/producao/gp/setup"
+         data-title="gerenciar produção setup bancadas checklist hipot gp gerenciamento"
+         data-index="2" tabindex="0" role="link" title="Abrir • atalho 2">
+        <span class="kbd-hint">2</span>
+        <div class="medal" aria-hidden="true"><i class="fa fa-clipboard-check"></i></div>
+        <h3>Gerenciar Produção</h3>
+        <p>Configurar bancadas, tempos e checklists por modelo.</p>
+        <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+      </a>
+
+      <a class="card navlink"
+         href="/producao/gp/painel/"
+         data-title="painel visual status em tempo real da produção"
+         data-index="3" tabindex="0" role="link" title="Abrir • atalho 3">
+        <span class="kbd-hint">3</span>
+        <div class="medal" aria-hidden="true"><i class="fa fa-chart-line"></i></div>
+        <h3>Painel Visual</h3>
+        <p>Status em tempo real da produção.</p>
+        <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+      </a>
+
+      <a class="card navlink"
+         href="{{ url_for('home_producao_bp.placeholder', slug='indicadores') }}"
+         data-title="indicadores kpi produtividade eficiência metas"
+         data-index="4" tabindex="0" role="link" title="Abrir • atalho 4">
+        <span class="kbd-hint">4</span>
+        <div class="medal" aria-hidden="true"><i class="fa fa-gauge-high"></i></div>
+        <h3>Indicadores</h3>
+        <p>KPIs e metas do setor.</p>
+        <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+      </a>
+
+      <a class="card navlink"
+         href="{{ url_for('home_producao_bp.placeholder', slug='rastreabilidade') }}"
+         data-title="rastreabilidade histórico completo de produção séries"
+         data-index="5" tabindex="0" role="link" title="Abrir • atalho 5">
+        <span class="kbd-hint">5</span>
+        <div class="medal" aria-hidden="true"><i class="fa fa-clipboard-list"></i></div>
+        <h3>Rastreabilidade das Máquinas</h3>
+        <p>Consultar histórico completo de produção.</p>
+        <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+      </a>
+
+      <a class="card navlink"
+         href="{{ url_for('home_producao_bp.placeholder', slug='relatorios') }}"
+         data-title="relatórios consolidados produção séries"
+         data-index="6" tabindex="0" role="link" title="Abrir • atalho 6">
+        <span class="kbd-hint">6</span>
+        <div class="medal" aria-hidden="true"><i class="fa fa-file-alt"></i></div>
+        <h3>Relatórios</h3>
+        <p>Consolidados por período e modelo.</p>
+        <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+      </a>
+
+      <a class="card navlink"
+         href="{{ url_for('home_producao_bp.placeholder', slug='omie') }}"
+         data-title="omie integração comunicação sistema omie produção"
+         data-index="7" tabindex="0" role="link" title="Abrir • atalho 7">
+        <span class="kbd-hint">7</span>
+        <div class="medal" aria-hidden="true"><i class="fa fa-plug"></i></div>
+        <h3>OMIE</h3>
+        <p>Comunicação com sistema OMIE.</p>
+        <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+      </a>
+
+      <a class="card navlink"
+         href="{{ url_for('home_producao_bp.placeholder', slug='livre') }}"
+         data-title="livre placeholder espaço para programação futura"
+         data-index="8" tabindex="0" role="link" title="Abrir • atalho 8">
+        <span class="kbd-hint">8</span>
+        <div class="medal" aria-hidden="true"><i class="fa fa-file-alt"></i></div>
+        <h3>LIVRE</h3>
+        <p>Para programação posterior.</p>
+        <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+      </a>
+    {% endif %}
+
+      {# ================== Card especial: AVISOS ================== #}
+{% set avisos_qtd = avisos_qtd|default(3) %}
+{% set avisos_href = avisos_href|default(url_for('home_producao_bp.placeholder', slug='avisos')) %}
+{% set avisos_ativos = avisos_qtd|int > 0 %}
+
+        <a class="card navlink card-avisos {{ 'is-alert' if avisos_ativos else 'is-ok' }}"
+          href="{{ avisos_href }}"
+          data-title="avisos alertas urgencias gargalos capacidade produtiva anomalias produção"
+          data-index="9"
+          tabindex="0"
+          role="link"
+          title="Abrir • atalho 9">
+          <span class="kbd-hint">9</span>
+          <span class="card-avisos-badge">{{ avisos_qtd }}</span>
+          <div class="medal" aria-hidden="true"><i class="fa fa-bell"></i></div>
+          <span class="card-avisos-label">
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+            {{ 'Alarmes ativos' if avisos_ativos else 'Sem alarmes' }}
+          </span>
+          <h3>AVISOS</h3>
+          <p>Central de alertas e anomalias do departamento de produção.</p>
+          <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+        </a>
+
+  </section>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_scripts
+[RESPONSABILIDADE] Implementar filtro (debounce), ripple, navegação (routeTo), atalhos (/, 1–9) e foco inicial
+==================================================================== -->
+{% block scripts %}
+<script>
+  // Filtro de cards com debounce
+  const filtro = document.getElementById('filtro');
+  const grid = document.getElementById('cardsGrid');
+  let timer;
+
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] applyFilter
+  // [RESPONSABILIDADE] Filtrar cards por texto (data-title + h3) no cliente
+  // ====================================================================
+  function applyFilter(){
+    const q = (filtro?.value || '').toLowerCase().trim();
+    [...grid.querySelectorAll('.card')].forEach(card=>{
+      const txt = (card.getAttribute('data-title')||'') + ' ' + (card.querySelector('h3')?.innerText||'').toLowerCase();
+      card.style.display = txt.includes(q)? '':'none';
+    });
+  }
+  // ====================================================================
+  // [FIM BLOCO] applyFilter
+  // ====================================================================
+
+  filtro?.addEventListener('input', ()=>{ clearTimeout(timer); timer = setTimeout(applyFilter, 80); });
+
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] addRipple
+  // [RESPONSABILIDADE] Criar efeito ripple no ponto do clique (ou centralizado via teclado)
+  // ====================================================================
+  function addRipple(target, evt){
+    const rect = target.getBoundingClientRect();
+    const cx = evt && typeof evt.clientX === 'number' ? evt.clientX - rect.left : rect.width/2;
+    const cy = evt && typeof evt.clientY === 'number' ? evt.clientY - rect.top  : rect.height/2;
+    const r = document.createElement('span');
+    r.className = 'ripple';
+    r.style.left = (cx-10)+'px';
+    r.style.top = (cy-10)+'px';
+    r.style.width = r.style.height = '20px';
+    target.appendChild(r);
+    setTimeout(()=> r.remove(), 600);
+  }
+  // ====================================================================
+  // [FIM BLOCO] addRipple
+  // ====================================================================
+
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] simulateClick
+  // [RESPONSABILIDADE] Simular acionamento do card via teclado (atalhos 1–9)
+  // ====================================================================
+  function simulateClick(el){
+    const href = el.getAttribute('href');
+    if (!href) return;
+    addRipple(el, null);
+    routeTo(href);
+  }
+  // ====================================================================
+  // [FIM BLOCO] simulateClick
+  // ====================================================================
+
+  // Ripple + transição suave (usa routeTo do _base.html)
+  grid?.querySelectorAll('.navlink').forEach(link=>{
+    link.addEventListener('click', (e)=>{
+      e.preventDefault();
+      addRipple(link, e);
+      const href = link.getAttribute('href');
+      routeTo(href);
+    });
+    link.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        simulateClick(link);
+      }
+    });
+
+    // Tooltip com atalho (somente 1–9)
+    const idx = link.getAttribute('data-index');
+    if (idx && Number(idx) <= 9) link.title = `Abrir • atalho ${idx}`;
+  });
+
+  // Atalhos: "/" foca a busca; "1–9" abrem cards visíveis
+  window.addEventListener('keydown', (e)=>{
+    if (e.key === '/' && document.activeElement !== filtro){
+      e.preventDefault(); filtro?.focus();
+    }
+    if (/^[1-9]$/.test(e.key)){
+      const n = Number(e.key);
+      const visibles = [...grid.querySelectorAll('.card')].filter(el=> el.style.display !== 'none');
+      if (visibles[n-1]) simulateClick(visibles[n-1]);
+    }
+  });
+
+  // Foco inicial se o usuário não clicar
+  let usedMouse=false;
+  window.addEventListener('mousedown', ()=> usedMouse=true, {once:true});
+  window.addEventListener('load', ()=> { if(!usedMouse) filtro?.focus(); });
+</script>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_scripts
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_subtitle
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_content
+DOCUMENTO_HTML: block_scripts
+FUNÇÃO: applyFilter
+FUNÇÃO: addRipple
+FUNÇÃO: simulateClick
+==================================================================== -->

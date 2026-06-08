@@ -1,0 +1,632 @@
+{% extends "_base.html" %}
+
+{% block title %}Nova Requisição de Compras — Pneumark SGP{% endblock %}
+
+{% block module_name %}Compras - Nova Requisição{% endblock %}
+
+{% block head_extra %}
+<style>
+
+.page-header{
+    margin-bottom:24px;
+}
+
+.page-header h2{
+    margin:0;
+}
+
+.card-form{
+    background:#fff;
+    border:1px solid #dfe6ee;
+    border-radius:12px;
+    padding:20px;
+    margin-bottom:20px;
+}
+
+.card-form h3{
+    margin-top:0;
+    margin-bottom:16px;
+    color:#1f2937;
+}
+
+.form-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:16px;
+}
+
+.form-group{
+    display:flex;
+    flex-direction:column;
+}
+
+.form-group label{
+    margin-bottom:6px;
+    font-weight:600;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea{
+    padding:10px;
+    border:1px solid #d0d5dd;
+    border-radius:8px;
+}
+
+.form-group textarea{
+    min-height:120px;
+    resize:vertical;
+}
+
+.actions{
+    display:flex;
+    gap:12px;
+    justify-content:flex-end;
+    flex-wrap:wrap;
+}
+
+.btn{
+    padding:10px 18px;
+    border-radius:8px;
+    text-decoration:none;
+    font-weight:600;
+    border:none;
+    cursor:pointer;
+}
+
+.btn-secondary{
+    background:#e5e7eb;
+    color:#111827;
+}
+
+.btn-warning{
+    background:#f59e0b;
+    color:#fff;
+}
+
+.btn-primary{
+    background:#c62828;
+    color:#fff;
+}
+
+.info-box{
+    background:#f8fafc;
+    border:1px dashed #cbd5e1;
+    border-radius:8px;
+    padding:12px;
+    font-size:.9rem;
+    color:#475569;
+}
+
+#busca-peca-container{
+    display:none;
+}
+
+#busca-peca-container.show{
+    display:block;
+}
+
+.search-results{
+    position:absolute;
+    background:#fff;
+    border:1px solid #d0d5dd;
+    border-radius:8px;
+    max-height:300px;
+    overflow-y:auto;
+    width:100%;
+    z-index:1000;
+    box-shadow:0 4px 12px rgba(0,0,0,.1);
+}
+
+.search-result-item{
+    padding:12px;
+    cursor:pointer;
+    border-bottom:1px solid #f3f4f6;
+}
+
+.search-result-item:hover{
+    background:#f9fafb;
+}
+
+.search-result-item strong{
+    display:block;
+    color:#1f2937;
+}
+
+.search-result-item small{
+    color:#6b7280;
+}
+
+#parecer-card{
+    display:none;
+    border-radius:12px;
+    padding:20px;
+    margin-top:20px;
+}
+
+#parecer-card.show{
+    display:block;
+}
+
+#parecer-card.verde{
+    background:#dcfce7;
+    border:2px solid #16a34a;
+}
+
+#parecer-card.amarelo{
+    background:#fef3c7;
+    border:2px solid #f59e0b;
+}
+
+#parecer-card.vermelho{
+    background:#fee2e2;
+    border:2px solid #dc2626;
+}
+
+#parecer-card.cinza{
+    background:#f3f4f6;
+    border:2px solid #9ca3af;
+}
+
+#parecer-card h4{
+    margin-top:0;
+    margin-bottom:12px;
+}
+
+.parecer-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:12px;
+    margin-top:12px;
+}
+
+.parecer-item{
+    display:flex;
+    flex-direction:column;
+}
+
+.parecer-item label{
+    font-size:.85rem;
+    font-weight:600;
+    margin-bottom:4px;
+}
+
+.parecer-item span{
+    font-size:1.1rem;
+    font-weight:700;
+}
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+
+    <div class="breadcrumb">
+        <a href="{{ url_for('compras_bp.tela_compras') }}">Compras</a>
+        /
+        <a href="{{ url_for('requisicoes.listar_requisicoes') }}">Requisições</a>
+        /
+        <strong>Nova Requisição</strong>
+    </div>
+
+    <h2>Nova Requisição de Compras</h2>
+    <small>Solicitação interna de materiais, serviços ou itens administrativos.</small>
+
+</div>
+
+<form method="POST" action="{{ url_for('requisicoes.nova_requisicao') }}">
+
+<div class="card-form">
+
+    <h3>Dados Gerais</h3>
+
+    <div class="form-grid">
+
+        <div class="form-group">
+            <label>Tipo da Requisição</label>
+            <select name="tipo_requisicao" required>
+                <option value="PRODUTIVO">Produtivo</option>
+                <option value="NAO_PRODUTIVO">Não Produtivo</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Solicitante</label>
+            <input type="text" value="{{ current_user.username if current_user.is_authenticated else 'Usuário' }}" readonly>
+        </div>
+
+        <div class="form-group">
+            <label>Setor</label>
+            <select name="setor" required>
+                <option value="">Selecione...</option>
+                <option value="Produção">Produção</option>
+                <option value="Qualidade">Qualidade</option>
+                <option value="Manutenção">Manutenção</option>
+                <option value="Administrativo">Administrativo</option>
+                <option value="Compras">Compras</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Urgência</label>
+            <select name="urgencia" required>
+                <option value="">Selecione...</option>
+                <option value="Baixa">Baixa</option>
+                <option value="Média">Média</option>
+                <option value="Alta">Alta</option>
+                <option value="Crítica">Crítica</option>
+            </select>
+        </div>
+
+    </div>
+
+</div>
+
+<div class="card-form">
+
+    <h3>Item Solicitado</h3>
+
+    <!-- Busca de Peça (apenas para Produtivo) -->
+    <div id="busca-peca-container">
+        <div class="form-group" style="position:relative;">
+            <label>Buscar Peça do Estoque</label>
+            <input type="text" id="busca-peca-input" placeholder="Digite código ou descrição da peça..." autocomplete="off">
+            <div id="search-results" class="search-results" style="display:none;"></div>
+        </div>
+        <input type="hidden" id="peca-id-hidden" name="peca_id">
+    </div>
+
+    <div class="form-grid">
+
+        <div class="form-group">
+            <label>Código Pneumark</label>
+            <input type="text" id="codigo-pneumark-input" name="codigo_pneumark" readonly>
+        </div>
+
+        <div class="form-group">
+            <label>Descrição</label>
+            <input type="text" id="descricao-input" name="descricao" required>
+        </div>
+
+        <div class="form-group">
+            <label>Quantidade</label>
+            <input type="number" id="quantidade-input" name="quantidade" step="0.001" min="0.001" required>
+        </div>
+
+        <div class="form-group">
+            <label>Prazo Desejado</label>
+            <input type="date" name="prazo_desejado">
+        </div>
+
+    </div>
+
+    <!-- Card de Parecer do Sistema -->
+    <div id="parecer-card">
+        <h4 id="parecer-titulo">Parecer do Sistema</h4>
+        <p id="parecer-mensagem"></p>
+        
+        <div class="parecer-grid">
+            <div class="parecer-item">
+                <label>Estoque Atual</label>
+                <span id="parecer-estoque-atual">—</span>
+            </div>
+            <div class="parecer-item">
+                <label>Ponto de Pedido</label>
+                <span id="parecer-ponto-pedido">—</span>
+            </div>
+            <div class="parecer-item">
+                <label>Estoque Máximo</label>
+                <span id="parecer-estoque-maximo">—</span>
+            </div>
+            <div class="parecer-item">
+                <label>Quantidade Sugerida</label>
+                <span id="parecer-quantidade-sugerida">—</span>
+            </div>
+            <div class="parecer-item" id="parecer-excesso-container" style="display:none;">
+                <label>Excesso Atual</label>
+                <span id="parecer-excesso-atual">—</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="card-form">
+
+    <h3>Referências e Anexos</h3>
+
+    <div class="form-grid">
+
+        <div class="form-group">
+            <label>Link de Referência</label>
+            <input type="url" name="link_referencia" placeholder="https://">
+        </div>
+
+        <div class="form-group">
+            <label>Anexo</label>
+            <input type="file" disabled>
+        </div>
+
+    </div>
+
+    <br>
+
+    <div class="info-box">
+        Futuramente será possível anexar múltiplos arquivos, catálogos,
+        desenhos técnicos, imagens e documentos de fornecedores.
+    </div>
+
+</div>
+
+<!-- Campos hidden para dados do parecer -->
+<input type="hidden" id="parecer-status-hidden" name="parecer_status">
+<input type="hidden" id="parecer-nivel-hidden" name="parecer_nivel">
+<input type="hidden" id="parecer-mensagem-hidden" name="parecer_mensagem">
+<input type="hidden" id="parecer-quantidade-sugerida-hidden" name="parecer_quantidade_sugerida">
+<input type="hidden" id="parecer-excesso-atual-hidden" name="parecer_excesso_atual">
+
+<div class="card-form">
+
+    <h3>Justificativa</h3>
+
+    <!-- Alerta para compra não recomendada -->
+    <div id="alerta-nao-recomendada" style="display:none; background:#fee2e2; border:2px solid #dc2626; border-radius:8px; padding:16px; margin-bottom:16px;">
+        <strong style="color:#991b1b; display:block; margin-bottom:8px;">⚠️ Atenção: Compra Não Recomendada</strong>
+        <p style="color:#7f1d1d; margin:0;">O sistema não recomenda esta compra. Se desejar continuar, informe uma justificativa clara e detalhada.</p>
+    </div>
+
+    <div class="form-group">
+        <label id="justificativa-label">Motivo da Solicitação</label>
+        <textarea id="observacao-geral-textarea" name="observacao_geral"></textarea>
+    </div>
+
+</div>
+
+<div class="actions">
+
+    <a class="btn btn-secondary"
+       href="{{ url_for('requisicoes.listar_requisicoes') }}">
+        Voltar
+    </a>
+
+    <button class="btn btn-primary" type="submit">
+        Enviar Requisição
+    </button>
+
+</div>
+
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoRequisicaoSelect = document.querySelector('select[name="tipo_requisicao"]');
+    const buscaPecaContainer = document.getElementById('busca-peca-container');
+    const buscaPecaInput = document.getElementById('busca-peca-input');
+    const searchResults = document.getElementById('search-results');
+    const pecaIdHidden = document.getElementById('peca-id-hidden');
+    const codigoPneumarkInput = document.getElementById('codigo-pneumark-input');
+    const descricaoInput = document.getElementById('descricao-input');
+    const quantidadeInput = document.getElementById('quantidade-input');
+    const parecerCard = document.getElementById('parecer-card');
+    const formulario = document.querySelector('form');
+    
+    let searchTimeout;
+    
+    // Validação do formulário antes do envio
+    formulario.addEventListener('submit', function(e) {
+        const parecerStatus = document.getElementById('parecer-status-hidden').value;
+        const observacaoGeral = document.getElementById('observacao-geral-textarea').value.trim();
+        const tipoRequisicao = tipoRequisicaoSelect.value;
+        const pecaId = pecaIdHidden.value;
+        
+        // Se for produtivo, exigir peça selecionada
+        if (tipoRequisicao === 'PRODUTIVO') {
+            if (!pecaId) {
+                e.preventDefault();
+                alert('Selecione uma peça válida do estoque antes de enviar a requisição produtiva.');
+                buscaPecaInput.focus();
+                return false;
+            }
+        }
+        
+        // Se for produtivo e não recomendada, exigir justificativa
+        if (tipoRequisicao === 'PRODUTIVO' && parecerStatus === 'NAO_RECOMENDADA') {
+            if (!observacaoGeral) {
+                e.preventDefault();
+                alert('Justificativa obrigatória para compra contra recomendação do sistema.');
+                document.getElementById('observacao-geral-textarea').focus();
+                return false;
+            }
+        }
+    });
+    
+    // Mostrar/ocultar busca de peça baseado no tipo
+    tipoRequisicaoSelect.addEventListener('change', function() {
+        if (this.value === 'PRODUTIVO') {
+            buscaPecaContainer.classList.add('show');
+            codigoPneumarkInput.setAttribute('readonly', true);
+            descricaoInput.setAttribute('readonly', true);
+        } else {
+            buscaPecaContainer.classList.remove('show');
+            codigoPneumarkInput.removeAttribute('readonly');
+            descricaoInput.removeAttribute('readonly');
+            limparSelecao();
+        }
+    });
+    
+    // Buscar peças ao digitar
+    buscaPecaInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+            searchResults.style.display = 'none';
+            return;
+        }
+        
+        searchTimeout = setTimeout(() => {
+            fetch(`/compras/requisicoes/api/pecas?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    mostrarResultados(data);
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar peças:', error);
+                });
+        }, 300);
+    });
+    
+    // Mostrar resultados da busca
+    function mostrarResultados(pecas) {
+        if (pecas.length === 0) {
+            searchResults.innerHTML = '<div style="padding:12px;color:#6b7280;">Nenhuma peça encontrada</div>';
+            searchResults.style.display = 'block';
+            return;
+        }
+        
+        searchResults.innerHTML = pecas.map(peca => `
+            <div class="search-result-item" data-peca-id="${peca.id}">
+                <strong>${peca.codigo_pneumark || 'Sem código'}</strong>
+                <small>${peca.descricao || 'Sem descrição'} | Estoque: ${peca.estoque_atual}</small>
+            </div>
+        `).join('');
+        
+        searchResults.style.display = 'block';
+        
+        // Adicionar eventos de clique
+        searchResults.querySelectorAll('.search-result-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const pecaId = this.dataset.pecaId;
+                selecionarPeca(pecaId);
+            });
+        });
+    }
+    
+    // Selecionar peça e carregar análise
+    function selecionarPeca(pecaId) {
+        fetch(`/compras/requisicoes/api/pecas/${pecaId}/analise`)
+            .then(response => response.json())
+            .then(data => {
+                // Preencher campos
+                pecaIdHidden.value = data.peca_id;
+                codigoPneumarkInput.value = data.codigo_pneumark || '';
+                descricaoInput.value = data.descricao || '';
+                
+                // Preencher quantidade sugerida se recomendada
+                if (data.status === 'RECOMENDADA' || data.status === 'ATENCAO') {
+                    if (data.quantidade_sugerida > 0) {
+                        quantidadeInput.value = data.quantidade_sugerida;
+                    }
+                }
+                
+                // Mostrar parecer
+                mostrarParecer(data);
+                
+                // Fechar resultados
+                searchResults.style.display = 'none';
+                buscaPecaInput.value = '';
+            })
+            .catch(error => {
+                console.error('Erro ao carregar análise:', error);
+                alert('Erro ao carregar análise da peça');
+            });
+    }
+    
+    // Mostrar card de parecer
+    function mostrarParecer(data) {
+        // Remover classes anteriores
+        parecerCard.className = '';
+        parecerCard.classList.add('show', data.nivel);
+        
+        // Preencher dados
+        document.getElementById('parecer-mensagem').textContent = data.mensagem;
+        document.getElementById('parecer-estoque-atual').textContent = data.estoque_atual || '—';
+        document.getElementById('parecer-ponto-pedido').textContent = data.ponto_pedido || '—';
+        document.getElementById('parecer-estoque-maximo').textContent = data.estoque_maximo || '—';
+        document.getElementById('parecer-quantidade-sugerida').textContent = data.quantidade_sugerida || '—';
+        
+        // Mostrar excesso se existir
+        const excessoContainer = document.getElementById('parecer-excesso-container');
+        if (data.excesso_atual) {
+            document.getElementById('parecer-excesso-atual').textContent = data.excesso_atual;
+            excessoContainer.style.display = 'flex';
+        } else {
+            excessoContainer.style.display = 'none';
+        }
+        
+        // Preencher campos hidden
+        document.getElementById('parecer-status-hidden').value = data.status || '';
+        document.getElementById('parecer-nivel-hidden').value = data.nivel || '';
+        document.getElementById('parecer-mensagem-hidden').value = data.mensagem || '';
+        document.getElementById('parecer-quantidade-sugerida-hidden').value = data.quantidade_sugerida || '';
+        document.getElementById('parecer-excesso-atual-hidden').value = data.excesso_atual || '';
+        
+        // Mostrar/ocultar alerta e tornar justificativa obrigatória
+        const alertaNaoRecomendada = document.getElementById('alerta-nao-recomendada');
+        const observacaoTextarea = document.getElementById('observacao-geral-textarea');
+        const justificativaLabel = document.getElementById('justificativa-label');
+        
+        if (data.status === 'NAO_RECOMENDADA') {
+            alertaNaoRecomendada.style.display = 'block';
+            observacaoTextarea.setAttribute('required', 'required');
+            justificativaLabel.innerHTML = 'Motivo da Solicitação <span style="color:#dc2626;">*</span>';
+        } else {
+            alertaNaoRecomendada.style.display = 'none';
+            observacaoTextarea.removeAttribute('required');
+            justificativaLabel.textContent = 'Motivo da Solicitação';
+        }
+    }
+    
+    // Recalcular análise com quantidade
+    let recalcularTimeout;
+    function recalcularAnalise() {
+        const pecaId = pecaIdHidden.value;
+        const quantidade = quantidadeInput.value;
+        
+        if (!pecaId || !quantidade || quantidade <= 0) {
+            return;
+        }
+        
+        clearTimeout(recalcularTimeout);
+        recalcularTimeout = setTimeout(() => {
+            fetch(`/compras/requisicoes/api/pecas/${pecaId}/analise?quantidade=${quantidade}`)
+                .then(response => response.json())
+                .then(data => {
+                    mostrarParecer(data);
+                })
+                .catch(error => {
+                    console.error('Erro ao recalcular análise:', error);
+                });
+        }, 500);
+    }
+    
+    // Event listener para mudança na quantidade
+    quantidadeInput.addEventListener('input', function() {
+        const pecaId = pecaIdHidden.value;
+        if (pecaId && tipoRequisicaoSelect.value === 'PRODUTIVO') {
+            recalcularAnalise();
+        }
+    });
+    
+    // Limpar seleção
+    function limparSelecao() {
+        pecaIdHidden.value = '';
+        codigoPneumarkInput.value = '';
+        descricaoInput.value = '';
+        quantidadeInput.value = '';
+        parecerCard.classList.remove('show');
+        searchResults.style.display = 'none';
+    }
+    
+    // Fechar resultados ao clicar fora
+    document.addEventListener('click', function(e) {
+        if (!buscaPecaInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.style.display = 'none';
+        }
+    });
+});
+</script>
+
+{% endblock %}

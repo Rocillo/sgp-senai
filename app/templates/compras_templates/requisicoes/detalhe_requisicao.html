@@ -1,0 +1,495 @@
+{% extends "_base.html" %}
+
+{% block title %}Detalhe da Requisição — Pneumark SGP{% endblock %}
+
+{% block module_name %}Compras - Detalhe da Requisição{% endblock %}
+
+{% block head_extra %}
+<style>
+
+.page-header{
+    margin-bottom:24px;
+}
+
+.page-header h2{
+    margin:0;
+}
+
+.status-badge{
+    display:inline-block;
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:.85rem;
+    font-weight:700;
+}
+
+.status-solicitada{
+    background:#dbeafe;
+    color:#1d4ed8;
+}
+
+.status-aprovada{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.status-rejeitada{
+    background:#fee2e2;
+    color:#991b1b;
+}
+
+.status-comprada{
+    background:#d1fae5;
+    color:#065f46;
+}
+
+.status-entregue{
+    background:#e0e7ff;
+    color:#3730a3;
+}
+
+.card-info{
+    background:#fff;
+    border:1px solid #dfe6ee;
+    border-radius:12px;
+    padding:20px;
+    margin-bottom:20px;
+}
+
+.card-info h3{
+    margin-top:0;
+    margin-bottom:16px;
+}
+
+.info-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:16px;
+}
+
+.info-item{
+    display:flex;
+    flex-direction:column;
+}
+
+.info-item label{
+    font-size:.85rem;
+    color:#64748b;
+    margin-bottom:4px;
+}
+
+.info-item strong{
+    color:#0f172a;
+}
+
+.timeline{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+
+.timeline-item{
+    border-left:4px solid #c62828;
+    padding-left:14px;
+}
+
+.timeline-item small{
+    color:#64748b;
+}
+
+.actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.btn{
+    text-decoration:none;
+    padding:10px 18px;
+    border-radius:8px;
+    font-weight:600;
+    border:none;
+    cursor:pointer;
+    font-size:1rem;
+}
+
+.btn-secondary{
+    background:#e5e7eb;
+    color:#111827;
+}
+
+.btn-success{
+    background:#16a34a;
+    color:#fff;
+}
+
+.btn-success:hover{
+    background:#15803d;
+}
+
+.btn-danger{
+    background:#dc2626;
+    color:#fff;
+}
+
+.btn-danger:hover{
+    background:#b91c1c;
+}
+
+.btn-primary{
+    background:#2563eb;
+    color:#fff;
+}
+
+.btn-primary:hover{
+    background:#1d4ed8;
+}
+
+.parecer-card{
+    border-radius:12px;
+    padding:20px;
+    margin-bottom:20px;
+}
+
+.parecer-card.verde{
+    background:#dcfce7;
+    border:2px solid #16a34a;
+}
+
+.parecer-card.amarelo{
+    background:#fef3c7;
+    border:2px solid #f59e0b;
+}
+
+.parecer-card.vermelho{
+    background:#fee2e2;
+    border:2px solid #dc2626;
+}
+
+.parecer-card.cinza{
+    background:#f3f4f6;
+    border:2px solid #9ca3af;
+}
+
+.parecer-card h3{
+    margin-top:0;
+    margin-bottom:12px;
+}
+
+.parecer-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:12px;
+    margin-top:12px;
+}
+
+.parecer-item{
+    display:flex;
+    flex-direction:column;
+}
+
+.parecer-item label{
+    font-size:.85rem;
+    font-weight:600;
+    margin-bottom:4px;
+    color:#64748b;
+}
+
+.parecer-item span{
+    font-size:1.1rem;
+    font-weight:700;
+    color:#0f172a;
+}
+
+.alerta-contra-recomendacao{
+    background:#fef2f2;
+    border:2px solid #dc2626;
+    border-radius:8px;
+    padding:12px;
+    margin-top:12px;
+    color:#991b1b;
+    font-weight:600;
+}
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+
+    <div class="breadcrumb">
+        <a href="{{ url_for('compras_bp.tela_compras') }}">Compras</a>
+        /
+        <a href="{{ url_for('requisicoes.listar_requisicoes') }}">Requisições</a>
+        /
+        <strong>{{ requisicao.numero_requisicao }}</strong>
+    </div>
+
+    <h2>
+        Requisição {{ requisicao.numero_requisicao }}
+    </h2>
+
+    <br>
+
+    <span class="status-badge
+        {% if requisicao.status == 'SOLICITADA' %}status-solicitada
+        {% elif requisicao.status == 'APROVADA' %}status-aprovada
+        {% elif requisicao.status == 'REJEITADA' %}status-rejeitada
+        {% elif requisicao.status == 'COMPRADA' %}status-comprada
+        {% elif requisicao.status == 'ENTREGUE' %}status-entregue
+        {% endif %}">
+        {{ requisicao.status|replace('_', ' ')|title }}
+    </span>
+
+</div>
+
+<div class="card-info">
+
+    <h3>Dados Gerais</h3>
+
+    <div class="info-grid">
+
+        <div class="info-item">
+            <label>Solicitante</label>
+            <strong>{{ requisicao.solicitante_nome_snapshot or 'N/A' }}</strong>
+        </div>
+
+        <div class="info-item">
+            <label>Setor</label>
+            <strong>{{ requisicao.setor or 'N/A' }}</strong>
+        </div>
+
+        <div class="info-item">
+            <label>Tipo</label>
+            <strong>{{ 'Produtivo' if 'PRO' in requisicao.numero_requisicao else 'Não Produtivo' }}</strong>
+        </div>
+
+        <div class="info-item">
+            <label>Urgência</label>
+            <strong>{{ requisicao.urgencia or 'N/A' }}</strong>
+        </div>
+
+        <div class="info-item">
+            <label>Data da Solicitação</label>
+            <strong>{{ requisicao.data_solicitacao.strftime('%d/%m/%Y %H:%M') if requisicao.data_solicitacao else 'N/A' }}</strong>
+        </div>
+
+        <div class="info-item">
+            <label>Prazo Desejado</label>
+            <strong>{{ requisicao.prazo_desejado.strftime('%d/%m/%Y') if requisicao.prazo_desejado else 'Não informado' }}</strong>
+        </div>
+
+    </div>
+
+</div>
+
+{% if itens %}
+    {% for item in itens %}
+    <div class="card-info">
+
+        <h3>Item Solicitado</h3>
+
+        <div class="info-grid">
+
+            <div class="info-item">
+                <label>Código Pneumark</label>
+                <strong>{{ item.codigo_pneumark_snapshot or 'Não informado' }}</strong>
+            </div>
+
+            <div class="info-item">
+                <label>Descrição</label>
+                <strong>{{ item.descricao_digitada or item.descricao_snapshot or 'N/A' }}</strong>
+            </div>
+
+            <div class="info-item">
+                <label>Quantidade</label>
+                <strong>{{ item.quantidade }}</strong>
+            </div>
+
+            <div class="info-item">
+                <label>Tipo</label>
+                <strong>{{ item.tipo_item|replace('_', ' ')|title }}</strong>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Parecer do Sistema (se existir) -->
+    {% if item.tipo_item == 'PRODUTIVO' and item.parecer_status %}
+    <div class="parecer-card {{ item.parecer_nivel }}">
+        <h3>Parecer do Sistema no Momento da Solicitação</h3>
+        
+        <p><strong>{{ item.parecer_mensagem }}</strong></p>
+        
+        <div class="parecer-grid">
+            <div class="parecer-item">
+                <label>Status do Parecer</label>
+                <span>{{ item.parecer_status|replace('_', ' ')|title }}</span>
+            </div>
+            
+            {% if item.parecer_quantidade_sugerida is not none %}
+            <div class="parecer-item">
+                <label>Quantidade Sugerida</label>
+                <span>{{ item.parecer_quantidade_sugerida }}</span>
+            </div>
+            {% endif %}
+            
+            {% if item.parecer_excesso_atual %}
+            <div class="parecer-item">
+                <label>Excesso Atual</label>
+                <span>{{ item.parecer_excesso_atual }}</span>
+            </div>
+            {% endif %}
+            
+            <div class="parecer-item">
+                <label>Decisão Contra Recomendação</label>
+                <span>{{ 'Sim' if item.decisao_contra_recomendacao else 'Não' }}</span>
+            </div>
+        </div>
+        
+        {% if item.decisao_contra_recomendacao %}
+        <div class="alerta-contra-recomendacao">
+            ⚠️ Usuário prosseguiu contra recomendação do sistema.
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if item.link_referencia_principal %}
+    <div class="card-info">
+
+        <h3>Referências</h3>
+
+        <div class="info-grid">
+
+            <div class="info-item">
+                <label>Link Informado</label>
+                <strong>
+                    <a href="{{ item.link_referencia_principal }}" target="_blank">{{ item.link_referencia_principal }}</a>
+                </strong>
+            </div>
+
+        </div>
+
+    </div>
+    {% endif %}
+
+    {% endfor %}
+{% endif %}
+
+{% if requisicao.observacao_geral %}
+<div class="card-info">
+
+    <h3>Justificativa</h3>
+
+    <p>
+        {{ requisicao.observacao_geral }}
+    </p>
+
+</div>
+{% endif %}
+
+<div class="card-info">
+
+    <h3>Resumo do Fluxo</h3>
+
+    <div class="info-grid">
+
+        <div class="info-item">
+            <label>Solicitada</label>
+            <strong>{{ resumo_fluxo["SOLICITADA"].strftime('%d/%m/%Y %H:%M') if resumo_fluxo["SOLICITADA"] else '—' }}</strong>
+        </div>
+
+        <div class="info-item">
+            <label>Aprovada</label>
+            <strong>{{ resumo_fluxo["APROVADA"].strftime('%d/%m/%Y %H:%M') if resumo_fluxo["APROVADA"] else '—' }}</strong>
+        </div>
+
+        <div class="info-item">
+            <label>Comprada</label>
+            <strong>{{ resumo_fluxo["COMPRADA"].strftime('%d/%m/%Y %H:%M') if resumo_fluxo["COMPRADA"] else '—' }}</strong>
+        </div>
+
+        <div class="info-item">
+            <label>Entregue</label>
+            <strong>{{ resumo_fluxo["ENTREGUE"].strftime('%d/%m/%Y %H:%M') if resumo_fluxo["ENTREGUE"] else '—' }}</strong>
+        </div>
+
+        {% if resumo_fluxo["REJEITADA"] %}
+        <div class="info-item">
+            <label>Rejeitada</label>
+            <strong style="color:#dc2626;">{{ resumo_fluxo["REJEITADA"].strftime('%d/%m/%Y %H:%M') }}</strong>
+        </div>
+        {% endif %}
+
+    </div>
+
+</div>
+
+<div class="card-info">
+
+    <h3>Histórico Completo</h3>
+
+    <div class="timeline">
+
+        {% if historico %}
+            {% for h in historico %}
+            <div class="timeline-item">
+                <strong>{{ h.status_novo|replace('_', ' ')|title }}</strong>
+                {% if h.comentario %}<br>{{ h.comentario }}{% endif %}<br>
+                <small>{{ h.data_evento.strftime('%d/%m/%Y %H:%M') if h.data_evento else 'N/A' }} - {{ h.usuario_nome_snapshot or h.origem_evento|title }}</small>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p style="color:#64748b;">Nenhum histórico disponível.</p>
+        {% endif %}
+
+    </div>
+
+</div>
+
+<div class="actions">
+
+    <a class="btn btn-secondary"
+       href="{{ url_for('requisicoes.listar_requisicoes') }}">
+        Voltar
+    </a>
+
+    {% if requisicao.status == 'SOLICITADA' %}
+    <form method="POST" action="{{ url_for('requisicoes.aprovar_requisicao', id=requisicao.id) }}" style="display:inline;">
+        <button type="submit" class="btn btn-success">
+            Aprovar
+        </button>
+    </form>
+    {% endif %}
+
+    {% if requisicao.status in ['SOLICITADA', 'APROVADA'] %}
+    <form method="POST" action="{{ url_for('requisicoes.rejeitar_requisicao', id=requisicao.id) }}" style="display:inline;">
+        <button type="submit" class="btn btn-danger">
+            Rejeitar
+        </button>
+    </form>
+    {% endif %}
+
+    {% if requisicao.status == 'APROVADA' %}
+    <form method="POST" action="{{ url_for('requisicoes.marcar_comprada', id=requisicao.id) }}" style="display:inline;">
+        <button type="submit" class="btn btn-primary">
+            Marcar como Comprada
+        </button>
+    </form>
+    {% endif %}
+
+    {% if requisicao.status == 'COMPRADA' %}
+    <form method="POST" action="{{ url_for('requisicoes.entregar_requisicao', id=requisicao.id) }}" style="display:inline;">
+        <button type="submit" class="btn btn-primary">
+            Marcar como Entregue
+        </button>
+    </form>
+    {% endif %}
+
+</div>
+
+{% endblock %}
