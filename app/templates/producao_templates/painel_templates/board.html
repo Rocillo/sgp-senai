@@ -4,63 +4,19 @@
 
 {% block head_extra %}
 <style>
-/* ==========================================================
-   PAINEL AO VIVO - SEM SIDEBAR / LARGURA TOTAL
-   Cole logo depois de: <style>
-   ========================================================== */
-
-html,
-body {
-    width: 100% !important;
-    margin: 0 !important;
-    overflow-x: hidden !important;
-}
-
-.app,
-.sgp-shell,
-.sgp-content-wrap {
-    width: 100% !important;
-    max-width: none !important;
-    margin-left: 0 !important;
-}
-
-.sgp-sidebar,
-.sgp-sidebar-backdrop,
-.sgp-mobile-sidebar-open {
-    display: none !important;
-}
-
-.appbar-inner {
-    max-width: none !important;
-    width: 100% !important;
-    margin: 0 !important;
-}
-
-main.container,
-.container {
-    max-width: none !important;
-    width: 100% !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-    padding-left: 8px !important;
-    padding-right: 8px !important;
-}
-
-.board-tight {
-    width: 100% !important;
-    max-width: none !important;
-}
-
-.board-grid {
-    width: 100% !important;
-    max-width: none !important;
-    grid-template-columns: repeat(10, minmax(120px, 1fr)) !important;
-}
-  /* --- AJUSTE CRÍTICO DE LAYOUT PARA 10 COLUNAS --- */
-  /* Força o container principal a usar quase toda a largura da tela nesta página */
-  .container {
-    max-width: 98vw !important;
-    padding: 0 10px !important;
+  /* --- AJUSTE DE LAYOUT PARA 10 COLUNAS COM SIDEBAR --- */
+  body,
+  .sgp-shell,
+  .appbar-inner,
+  .container,
+  main.container {
+      max-width: 100% !important;
+      width: 100% !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      padding-left: 20px !important;
+      padding-right: 20px !important;
+      box-sizing: border-box !important;
   }
 
   /* Remove as margens negativas antigas que cortavam a tela */
@@ -696,50 +652,41 @@ main.container,
   }
 
   /* ==========================================================
-   CORREÇÃO FINAL - PAINEL AO VIVO SEM SIDEBAR
-   DEVE FICAR NO FINAL DO <style>
+   INTEGRAÇÃO DA SIDEBAR COM O PAINEL AO VIVO
    ========================================================== */
 
-.sgp-sidebar,
-.sgp-sidebar-backdrop,
-.sgp-mobile-sidebar-open {
-    display: none !important;
-}
+  .board-tight {
+      width: 100% !important;
+      max-width: 100% !important;
+      padding: 0 10px;
+      box-sizing: border-box;
+  }
 
-.sgp-content-wrap {
-    margin-left: 0 !important;
-    width: 100vw !important;
-    max-width: 100vw !important;
-}
+  .board-tight .board-grid {
+      width: 100% !important;
+      max-width: 100% !important;
+      display: grid !important;
+      grid-template-columns: repeat(10, minmax(130px, 1fr)) !important;
+      gap: 10px !important;
+      overflow-x: auto !important;
+      padding-bottom: 15px !important;
+  }
 
-.sgp-shell,
-.app {
-    width: 100vw !important;
-    max-width: 100vw !important;
-}
-
-.appbar,
-.appbar-inner,
-main.container,
-.container {
-    width: 100vw !important;
-    max-width: 100vw !important;
-    margin-left: 5px !important;
-    margin-right: 5px !important;
-}
-
-.board-tight {
-    width: calc(100% - 10px) !important;
-    max-width: calc(100% - 10px) !important;
-    margin-left: 15px !important;
-    margin-right: 15px !important;
-}
-
-.board-tight .board-grid {
-    width: 100% !important;
-    max-width: 100% !important;
-    grid-template-columns: repeat(10, minmax(120px, 1fr)) !important;
-}
+  /* Barra de rolagem horizontal premium para o grid */
+  .board-tight .board-grid::-webkit-scrollbar {
+      height: 8px;
+  }
+  .board-tight .board-grid::-webkit-scrollbar-track {
+      background: #0b1329;
+      border-radius: 4px;
+  }
+  .board-tight .board-grid::-webkit-scrollbar-thumb {
+      background: #1d4ed8;
+      border-radius: 4px;
+  }
+  .board-tight .board-grid::-webkit-scrollbar-thumb:hover {
+      background: #2563eb;
+  }
 
 </style>
 {% endblock %}
@@ -913,6 +860,11 @@ main.container,
                autocomplete="off">
       </div>
 
+      <!-- Banner de status do timer ativo -->
+      <div id="checklistActiveTimerBanner"
+           style="display:none; margin-bottom:15px; padding:12px; border-radius:10px; text-align:center; font-weight:bold; font-size:15px; transition: all 0.3s ease;">
+      </div>
+
       <!-- CHECKLIST DINÂMICO -->
       <div id="checklistItems"
            style="margin-top:15px;">
@@ -970,10 +922,6 @@ main.container,
     </form>
   </div>
 </div>
-
-
-</div>
-
 
 {% endblock %}
 
@@ -1255,6 +1203,12 @@ main.container,
         return;
       }
 
+      const banner = document.getElementById('checklistActiveTimerBanner');
+      if (banner) {
+        banner.style.display = 'none';
+        banner.innerHTML = '';
+      }
+
       checklistModeloAtual = m;
       checklistStartedAtIso = new Date().toISOString();
 
@@ -1444,9 +1398,18 @@ main.container,
   }
 
   function ativarProximo(index) {
+    const banner = document.getElementById('checklistActiveTimerBanner');
+
     // fim: apenas habilita salvar (não auto-salva)
     if (index >= listaItensGlobal.length) {
       verificarBotaoSalvar();
+      if (banner) {
+        banner.style.display = 'block';
+        banner.style.background = '#155724';
+        banner.style.color = '#d4edda';
+        banner.style.border = '1px solid #c3e6cb';
+        banner.innerHTML = '✨ Checklist concluído! Clique em "Salvar e Fechar"';
+      }
       return;
     }
 
@@ -1466,11 +1429,19 @@ main.container,
     row.classList.remove('item-aguardando');
     row.style.opacity = "1";
 
-    if (item.bloqueante && item.min_s > 0) {
+    if (item.min_s && item.min_s > 0) {
       let seg = item.min_s;
       display.style.color = "#fccf7e";
 
       if (row.dataset.intervalId) clearInterval(Number(row.dataset.intervalId));
+
+      if (banner) {
+        banner.style.display = 'block';
+        banner.style.background = '#fff3cd';
+        banner.style.color = '#856404';
+        banner.style.border = '1px solid #ffeeba';
+        banner.innerHTML = `⏳ Aguardando tempo mínimo da tarefa ${index + 1}: <strong>${seg}s</strong>`;
+      }
 
       const crono = setInterval(() => {
         if (seg <= 0) {
@@ -1481,8 +1452,18 @@ main.container,
           bOk.classList.add('liberado');
           bFail.classList.add('liberado');
           if (bRework) bRework.classList.add('liberado');
+
+          if (banner) {
+            banner.style.background = '#d4edda';
+            banner.style.color = '#155724';
+            banner.style.border = '1px solid #c3e6cb';
+            banner.innerHTML = `✅ Tarefa ${index + 1} liberada! Selecione o resultado abaixo.`;
+          }
         } else {
           display.textContent = `ESPERE ${seg}s`;
+          if (banner) {
+            banner.innerHTML = `⏳ Aguardando tempo mínimo da tarefa ${index + 1}: <strong>${seg}s</strong>`;
+          }
           seg--;
         }
       }, 1000);
@@ -1494,6 +1475,14 @@ main.container,
       bOk.classList.add('liberado');
       bFail.classList.add('liberado');
       if (bRework) bRework.classList.add('liberado');
+
+      if (banner) {
+        banner.style.display = 'block';
+        banner.style.background = '#d4edda';
+        banner.style.color = '#155724';
+        banner.style.border = '1px solid #c3e6cb';
+        banner.innerHTML = `✅ Tarefa ${index + 1} liberada! Selecione o resultado abaixo.`;
+      }
     }
 
     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1648,6 +1637,12 @@ function liberarChecklistItem(index) {
           }
         });
       } catch (e) {}
+
+      const banner = document.getElementById('checklistActiveTimerBanner');
+      if (banner) {
+        banner.style.display = 'none';
+        banner.innerHTML = '';
+      }
 
       checklistBackdrop.style.display = 'none';
     }
@@ -1968,6 +1963,21 @@ function liberarChecklistItem(index) {
       const phrase = `Montagem do ${modelo} na etapa ${bench} concluída.`;
       
       if (phrase) AudioMgr.queue(phrase);
+    }
+
+    function friendlyErrorText(data) {
+      if (!data) return 'Erro desconhecido.';
+      if (data.message) return data.message;
+      if (data.error) {
+        const MAP = {
+          'fetch_failed': 'Falha na comunicação com o servidor.',
+          'data_invalida': 'Dados inválidos enviados.',
+          'serial_nao_encontrado': 'Número de série não encontrado.',
+        };
+        return MAP[data.error] || data.error;
+      }
+      if (data.hint) return `Erro: ${data.hint}`;
+      return 'Erro inesperado.';
     }
 
     async function postScan(payload) {

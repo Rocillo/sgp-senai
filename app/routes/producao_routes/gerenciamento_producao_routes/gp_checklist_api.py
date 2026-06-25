@@ -525,9 +525,66 @@ def salvar_execucao():
         )
         exec_.result = "fail" if any_fail else "ok"
 
-    db.session.commit()
+    # --- Integrar com fluxo Kanban do SGP (avançar etapa B8 e registrar conclusão se necessário) ---
+    try:
+        from app.models_sqla import GPWorkOrder, GPWorkStage
+        from app.services.producao.bench_flow_service import advance_after_finish
 
+        order = GPWorkOrder.query.filter_by(serial=serial).first()
+        if order:
+            # 1. Atualizar e fechar a etapa B8 (Checklist) aberta
+            stage_b8 = GPWorkStage.query.filter_by(
+                order_id=order.id, bench_id="b8", finished_at=None
+            ).first()
+            if not stage_b8 and order.current_bench == "b8":
+                stage_b8 = GPWorkStage(
+                    order_id=order.id,
+                    bench_id="b8",
+                    started_at=started_at or datetime.utcnow(),
+                    operador=operador
+                )
+                db.session.add(stage_b8)
+
+            if stage_b8:
+                res_status = "APR" if exec_.result == "ok" else "REP"
+                stage_b8.result = res_status
+                stage_b8.rework_flag = res_status == "REP"
+                stage_b8.finished_at = datetime.utcnow()
+                db.session.add(stage_b8)
+
+            # 2. Avançar a ordem para a próxima etapa (calculada dinamicamente pelo roteiro)
+            if order.current_bench == "b8":
+                adv_res = advance_after_finish(db.session, serial)
+                nxt = adv_res.get("current_bench")
+
+                # 3. Se a próxima etapa for 'final', fechar a ordem de produção
+                if nxt == "final":
+                    order.status = "done"
+                    order.finished_at = datetime.utcnow()
+                    order.updated_at = datetime.utcnow()
+                    db.session.add(order)
+
+                    # Registrar a conclusão do produto acabado no estoque
+                    try:
+                        from app.routes.producao_routes.maquinas_routes.consumo_service import (
+                            registrar_conclusao_produto_acabado,
+                        )
+                        registrar_conclusao_produto_acabado(
+                            modelo=order.modelo,
+                            quantidade=1,
+                            usuario=operador or "sistema",
+                            referencia=order.serial,
+                            session=db.session,
+                        )
+                    except Exception as e:
+                        pass
+    except Exception as e:
+        db.session.rollback()
+        return _err(f"Falha ao integrar com fluxo Kanban: {str(e)}", 500)
+
+    db.session.commit()
     return _ok(exec_id=exec_.id)
+
     # ====================================================================
     # [BLOCO] BLOCO_DB
     # [NOME] criacao_execucao_checklist_db

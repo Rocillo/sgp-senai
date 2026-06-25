@@ -1,0 +1,23 @@
+# ====================================================================
+# [BLOCO] DEPLOY
+# [NOME] docker-compose.yml
+# [RESPONSABILIDADE] Orquestrar o container da aplicação SGP rodando com o SQLite local (.db) persistido
+# ====================================================================
+
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: sgp_web
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - SECRET_KEY=minha_chave_secreta_super_segura
+      - SERIES_ADMIN_PIN=4321
+      # Aponta para o arquivo de banco de dados dentro do volume montado
+      - DATABASE_URL=sqlite:////app/db/pneumark.db
+    volumes:
+      # Mapeia a pasta local './docker_data' do host para a pasta '/app/db' do container
+      - ./docker_data:/app/db

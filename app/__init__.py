@@ -101,7 +101,14 @@ def create_app() -> Flask:
 
         raw_db_url = s
 
-    database_url = raw_db_url or "sqlite:///pneumark.db"
+    if raw_db_url:
+        database_url = raw_db_url
+    else:
+        # Define o caminho absoluto para pneumark.db no diretório raiz do projeto
+        basedir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+        db_path = os.path.join(basedir, "pneumark.db").replace("\\", "/")
+        database_url = f"sqlite:///{db_path}"
+
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SERIES_ADMIN_PIN"] = os.environ.get("SERIES_ADMIN_PIN", "4321")

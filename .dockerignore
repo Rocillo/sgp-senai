@@ -1,0 +1,47 @@
+# Controle de versão e IDEs
+.git/
+.gitignore
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Ambientes virtuais e cache do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+env/
+venv/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Bancos de dados e arquivos locais voláteis
+pneumark.db
+*.db
+logs/
+*.log
+scratch/
+temp/
+instance/
+
+# Arquivos de documentação ou manuais pesados no container
+*.btw
+*.docx
+*.xlsx
+*.xltm
+*.pdf
+board.html*
+estrutura_*.txt
+routes.txt
+flask_scan_debug.txt
+htmlAprovados/
+collector_hipot_post/
+tests/

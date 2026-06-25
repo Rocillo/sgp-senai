@@ -144,6 +144,8 @@
           ordem: it.ordem ?? 0,
           descricao: it.descricao || "",
           tempo_seg: Number.isFinite(parseInt(it.tempo_seg,10)) ? parseInt(it.tempo_seg,10) : 0,
+          min_s: Number.isFinite(parseInt(it.min_s,10)) ? parseInt(it.min_s,10) : 0,
+          max_s: Number.isFinite(parseInt(it.max_s,10)) ? parseInt(it.max_s,10) : 0,
           ncr_tags: Array.isArray(it.ncr_tags) ? it.ncr_tags : []
         })) : []
       });
@@ -175,6 +177,8 @@
         ordem: i.ordem ?? 0,
         descricao: i.descricao || "",
         tempo_seg: Number.isFinite(parseInt(i.tempo_seg,10)) ? parseInt(i.tempo_seg,10) : 0,
+        min_s: Number.isFinite(parseInt(i.min_s,10)) ? parseInt(i.min_s,10) : 0,
+        max_s: Number.isFinite(parseInt(i.max_s,10)) ? parseInt(i.max_s,10) : 0,
         ncr_tags: Array.isArray(i.ncr_tags) ? i.ncr_tags : []
       }))
     };
@@ -227,10 +231,11 @@
     h.textContent = `${idx+1}. ${it.descricao}`;
     outer.appendChild(h);
 
+    const minTime = (it.min_s && it.min_s > 0) ? it.min_s : Math.ceil(it.tempo_seg * TOLERANCIA);
     const meta = document.createElement("div");
     meta.className = "meta";
     meta.innerHTML = `
-      <span><b>Tempo:</b> ${it.tempo_seg}s (libera aos ~${Math.ceil(it.tempo_seg*TOLERANCIA)}s)</span>
+      <span><b>Tempo:</b> ${it.tempo_seg}s (libera aos ~${minTime}s)</span>
       <span><b>Status:</b> ${st.status === "ok" ? "<span class='status-ok'>OK</span>" :
                            st.status === "nok" ? "<span class='status-nok'>Não conforme</span>" :
                            "Pendente"}</span>
@@ -291,6 +296,7 @@
     outer.appendChild(c);
 
     if (running) {
+      const minTime = (it.min_s && it.min_s > 0) ? it.min_s : Math.ceil(it.tempo_seg * TOLERANCIA);
       const iv = setInterval(() => {
         const now = Date.now();
         st.elapsed = Math.floor((now - timers[idx].startedRealAt)/1000);
@@ -298,7 +304,7 @@
         btnOk.disabled = !canFinish(idx);
         btnNok.disabled = !canFinish(idx);
         meta.innerHTML = `
-          <span><b>Tempo:</b> ${it.tempo_seg}s (libera aos ~${Math.ceil(it.tempo_seg*TOLERANCIA)}s)</span>
+          <span><b>Tempo:</b> ${it.tempo_seg}s (libera aos ~${minTime}s)</span>
           <span><b>Status:</b> Rodando…</span>
           <span><b>Gasto:</b> ${fmt(st.elapsed)}s</span>
         `;
@@ -359,7 +365,8 @@
   function canFinish(idx){
     const it = checklist.items[idx];
     const st = itemsState[idx];
-    return st.elapsed >= Math.ceil(it.tempo_seg * TOLERANCIA);
+    const minTime = (it.min_s && it.min_s > 0) ? it.min_s : Math.ceil(it.tempo_seg * TOLERANCIA);
+    return st.elapsed >= minTime;
   }
   // ====================================================================
   // [FIM BLOCO] canFinish
