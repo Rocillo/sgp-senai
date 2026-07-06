@@ -170,3 +170,27 @@ Siga este roteiro passo a passo para testar e operar a integração completa em 
 3. O coletor desktop salvará o teste localmente no `hipot.db` e atualizará o status de sincronização para vermelho: `🔴 SGP Sync: Servidor SGP offline (1 pendentes)`. A operação na fábrica continua sem travar a tela.
 4. Reinicie o servidor Flask executando `python main.py` novamente.
 5. Em até 30 segundos, o coletor desktop identificará que o servidor está online, enviará todas as pendências da fila local de forma transparente e atualizará o status de sincronização de volta para o verde (`totalmente sincronizado`), atualizando também os dados da Live Board.
+
+---
+
+## 7. Execução em Container Docker (Solução e Ajustes)
+
+Se você decidir implantar a aplicação central SGP via **Docker**, a arquitetura de integração continuará sendo 100% funcional. Veja o comportamento de cada parte e como ativá-lo:
+
+### A. Sincronização de Dados (PySide6 -> Docker)
+- **Funciona perfeitamente**: Como a sincronização de banco de dados (`SyncWorker`) é baseada em chamadas HTTP REST, ela é totalmente compatível.
+- A única configuração necessária é garantir que o arquivo `config.json` na estação do operador aponte para a porta pública exposta do Docker (ex: `http://localhost:5000` ou o IP do servidor na rede).
+
+### B. Inicialização do Coletor Desktop (Board -> Windows do Operador)
+- **Desafio do Container**: O container Docker roda sob um ambiente Linux isolado e sem servidor de exibição gráfica (sem GUI). Por esse motivo, o comando tradicional de servidor `subprocess.Popen` não consegue abrir janelas no Windows do operador.
+- **Solução (Protocolo Customizado)**:
+  Nós implementamos um mecanismo inteligente de **fallback**. Quando o servidor SGP detecta que está rodando sob Docker (ou nuvem), ele sinaliza o erro de execução local e a página web (`board.html`) abre o coletor diretamente a partir do navegador do cliente usando o protocolo customizado do Windows (`hipot://[serial]`).
+
+### C. Passo a Passo para Ativar o Launcher no Docker:
+1. No computador Windows da estação do operador, abra o terminal no diretório do projeto e execute:
+   ```bash
+   python collector_hipot_post/register_protocol.py
+   ```
+2. Este script registrará a associação do protocolo `hipot://` no Registro do Windows do usuário logado (não requer privilégios de administrador).
+3. Pronto! Ao clicar no botão no SGP (rodando em Docker), o navegador chamará o Windows que abrirá a janela gráfica do coletor elétrico localmente preenchendo o número de série da peça atual.
+

@@ -56,7 +56,19 @@ class HipotWindow(QWidget):
         # Verifica se um número de série foi passado como argumento de linha de comando
         import sys
         if len(sys.argv) > 1:
-            serial_arg = sys.argv[1].strip()
+            arg = sys.argv[1].strip()
+            # Trata links de protocolo customizado (ex: hipot://XYZ ou hipot://open?serial=XYZ)
+            if arg.startswith("hipot://"):
+                serial_arg = arg.replace("hipot://", "")
+                if "serial=" in serial_arg:
+                    try:
+                        serial_arg = serial_arg.split("serial=")[1].split("&")[0]
+                    except Exception:
+                        pass
+                serial_arg = serial_arg.rstrip("/")
+            else:
+                serial_arg = arg
+
             if serial_arg:
                 self.sn_input.setText(serial_arg)
                 self.logger.log(f"[GUI] Número de série pré-preenchido via argumento: {serial_arg}")

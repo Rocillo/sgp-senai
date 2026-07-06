@@ -1741,8 +1741,9 @@ function liberarChecklistItem(index) {
           });
 
           if (!r.ok) {
-            const txt = await r.text();
-            showToast('Erro ao iniciar', `Servidor retornou status ${r.status}: ${txt.substring(0, 100)}`, 'error', 7000);
+            // SGP rodando em Docker ou servidor remoto: usa o link de protocolo local registrado no cliente Windows
+            window.location.href = `hipot://${serial}`;
+            showToast('Aviso', 'SGP em Container/Remoto: Abrindo coletor via protocolo local "hipot://".', 'warn', 7000);
             return;
           }
 
@@ -1750,10 +1751,14 @@ function liberarChecklistItem(index) {
           if (d.ok) {
             showToast('Sucesso', 'Coletor elétrico iniciado na máquina.', 'success', 4000);
           } else {
-            showToast('Erro ao iniciar', d.error || 'Falha ao executar coletor.', 'error', 7000);
+            // Fallback de segurança se falhar o spawn local no servidor
+            window.location.href = `hipot://${serial}`;
+            showToast('Aviso', 'Falha no spawn local: Tentando abrir coletor via protocolo local "hipot://".', 'warn', 7000);
           }
         } catch (e) {
-          showToast('Erro de Rede', `Não foi possível enviar comando para o servidor local: ${e.message || e}`, 'error', 7000);
+          // Se o servidor SGP estiver completamente offline, tenta ainda o protocolo customizado local no cliente
+          window.location.href = `hipot://${serial}`;
+          showToast('Aviso', 'Servidor SGP inacessível: Tentando abrir coletor via protocolo local "hipot://".', 'warn', 7000);
         } finally {
           btnLaunchCollector.disabled = false;
           btnLaunchCollector.textContent = '🔌 Abrir Coletor Desktop (Hi-Pot)';

@@ -679,6 +679,14 @@ def hipot_collector_launch():
         import sys
         import os
 
+        # Se o servidor estiver executando em ambiente isolado/Docker,
+        # rejeita a requisição para forçar o fallback automático do navegador via protocolo local.
+        if os.path.exists('/.dockerenv') or os.environ.get('IS_DOCKER') == 'true':
+            return jsonify({
+                "ok": False,
+                "error": "O SGP está sendo executado em Docker/Container."
+            }), 400
+
         data = request.get_json(force=True, silent=True) or {}
         serial = (data.get("serial") or "").strip()
 
