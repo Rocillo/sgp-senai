@@ -540,6 +540,7 @@ def rastreabilidade_api_detalhe(serial: str):
         "ordem_producao": getattr(work_order, "id", None),
         "criado_em": _fmt_dt_iso(getattr(work_order, "created_at", None)),
         "criado_por": getattr(work_order, "created_by", None),
+        "status": getattr(work_order, "status", None),
         "status_atual": getattr(work_order, "status", None),
         "current_bench": getattr(work_order, "current_bench", None),
         "ultima_atualizacao": _fmt_dt_iso(getattr(work_order, "updated_at", None)),

@@ -102,14 +102,14 @@ def get_trace_timeline(serial):
                 [
                     it
                     for it in exec_items
-                    if str(getattr(it, "status", "")).strip().lower() == "sim"
+                    if str(getattr(it, "status", "")).strip().lower() in ("sim", "ok", "aprovado")
                 ]
             )
             items_nok = len(
                 [
                     it
                     for it in exec_items
-                    if str(getattr(it, "status", "")).strip().lower() == "nao"
+                    if str(getattr(it, "status", "")).strip().lower() in ("nao", "não", "reprovado", "fail", "retrabalho", "nok")
                 ]
             )
             started_at = getattr(exec_item, "started_at", None)
@@ -153,9 +153,8 @@ def get_trace_timeline(serial):
                         "operador": getattr(hipot, "operador", None),
                         "started_at": _iso(started_at),
                         "finished_at": _iso(finished_at),
-                        "hp_v_obs_v": getattr(
-                            hipot, "hp_v_obs_v", getattr(hipot, "hp_v", None)
-                        ),
+                        "hp_v": getattr(hipot, "hp_v_obs_v", None),
+                        "hp_v_obs_v": getattr(hipot, "hp_v_obs_v", None),
                         "hp_t_s": getattr(hipot, "hp_t_s", None),
                         "final_ok": getattr(hipot, "final_ok", None),
                         "observacoes": getattr(hipot, "observacoes", None),

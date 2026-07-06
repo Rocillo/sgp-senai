@@ -234,36 +234,178 @@ def hipot_create_table():
 
 # ====================================================================
 # [BLOCO] FUNÇÃO
+# [NOME] _parse_relatorio_hipot
+# [RESPONSABILIDADE] Extrair hp_ileak_ma, gb_r_mohm e modelo de um relatório estruturado por '|'
+# ====================================================================
+def _parse_relatorio_hipot(relatorio: str):
+    hp_ileak = None
+    gb_r = None
+    modelo = None
+
+    if not relatorio:
+        return hp_ileak, gb_r, modelo
+
+    parts = [p.strip() for p in relatorio.split("|")]
+    for part in parts:
+        if "mA" in part:
+            try:
+                hp_ileak = float(part.replace("mA", "").strip())
+            except ValueError:
+                pass
+        elif "mR" in part or "mΩ" in part or "mohm" in part.lower():
+            try:
+                clean_part = part.replace("mR", "").replace("mΩ", "").strip()
+                import re
+                clean_part = re.sub(r'mohm', '', clean_part, flags=re.IGNORECASE).strip()
+                gb_r = float(clean_part)
+            except ValueError:
+                pass
+        elif any(part.upper().startswith(prefix) for prefix in ["HGF", "PM"]):
+            modelo = part
+
+    return hp_ileak, gb_r, modelo
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _parse_datetime
+# [RESPONSABILIDADE] Parser robusto de data/hora suportando ISO e formato brasileiro
+# ====================================================================
+def _parse_datetime(dt_str):
+    if not dt_str:
+        return datetime.utcnow()
+    # Tenta formato ISO
+    try:
+        return datetime.fromisoformat(dt_str)
+    except ValueError:
+        pass
+    # Tenta formato brasileiro (utilizado no hipot.db local do desktop)
+    try:
+        return datetime.strptime(dt_str, "%d/%m/%Y %H:%M:%S")
+    except ValueError:
+        pass
+    return datetime.utcnow()
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
 # [NOME] hipot_result_apply
 # [RESPONSABILIDADE] Receber e aplicar resultado do HiPoT via endpoint JSON (coletor/ingestor)
 # ====================================================================
 @gp_hipot_bp.route("/api/result", methods=["POST"])
 def hipot_result_apply():
     """
-    Endpoint para o coletor/ingestor enviar o resultado do HiPoT.
+    Endpoint para o coletor/ingestor sincronizar/enviar o resultado do HiPoT.
     Espera JSON como:
     {
       "serial": "581150",
-      "status": "APR" | "OK" | "REP",
-      "received_at": "2025-09-11 18:55:13"  # opcional (ISO). Se faltar, usa agora()
+      "status": "APR" | "OK" | "REP" | "APROVADO" | "REPROVADO",
+      "operador": "Weverton",
+      "relatorio": "ENTRAN | HGF148 | 1.25 mA | 0.05 mR | APR",
+      "porta_com": "COM3",
+      "baudrate": 9600,
+      "received_at": "2025-09-11 18:55:13"  # ISO ou %d/%m/%Y %H:%M:%S. Se omitido, usa utcnow()
     }
     """
     data = request.get_json(force=True, silent=True) or {}
+    serial = (data.get("serial") or "").strip()
+    status_raw = (data.get("status") or data.get("resultado") or "").strip().upper()
+
+    if not serial:
+        return jsonify({"ok": False, "error": "Número de Série é obrigatório"}), 400
+
+    # Normaliza status para "APR" ou "REP"
+    if status_raw in {"APR", "OK", "APROVADO"}:
+        status = "APR"
+    elif status_raw in {"REP", "REPROVADO"}:
+        status = "REP"
+    else:
+        return jsonify({"ok": False, "error": f"Status inválido: {status_raw}"}), 400
+
+    dt_str = data.get("received_at") or data.get("data_hora")
+    started_at = _parse_datetime(dt_str)
+
+    # 1. Verificar duplicado para garantir idempotência
+    duplicate = GPHipotRun.query.filter_by(serial=serial, started_at=started_at).first()
+    if duplicate:
+        return jsonify({
+            "ok": True,
+            "message": "Registro duplicado ignorado",
+            "serial": serial,
+            "hipot_status": status,
+            "final_ok": duplicate.final_ok
+        })
+
+    # 2. Parse do relatório para extrair medições
+    relatorio = data.get("relatorio") or ""
+    hp_ileak, gb_r, parsed_modelo = _parse_relatorio_hipot(relatorio)
+
+    # 3. Criar registro GPHipotRun para rastreabilidade completa
+    final_ok = (status == "APR")
+    gb_ok = final_ok
+    hp_ok = final_ok
+
+    operador = data.get("operador")
+    porta_com = data.get("porta_com")
+    baudrate = data.get("baudrate")
+
+    obs_parts = []
+    if relatorio:
+        obs_parts.append(relatorio)
+    if porta_com:
+        obs_parts.append(f"Porta: {porta_com}")
+    if baudrate:
+        obs_parts.append(f"Baud: {baudrate}")
+    obs = " | ".join(obs_parts) if obs_parts else None
+
+    run = GPHipotRun(
+        serial=serial,
+        modelo=parsed_modelo,
+        operador=operador,
+        obs=obs,
+        started_at=started_at,
+        finished_at=started_at,
+        gb_ok=gb_ok,
+        gb_r_mohm=gb_r,
+        hp_ok=hp_ok,
+        hp_ileak_ma=hp_ileak,
+        final_ok=final_ok
+    )
+    db.session.add(run)
+    db.session.commit()
+
     try:
-        order = aplicar_resultado_hipot(data)
-        return jsonify(
-            {
-                "ok": True,
-                "serial": order.serial,
-                "hipot_status": order.hipot_status,
-                "hipot_flag": order.hipot_flag,
-                "hipot_last_at": (
-                    order.hipot_last_at.isoformat() if order.hipot_last_at else None
-                ),
-            }
-        )
+        # 4. Atualizar etapa B5 se estiver aberta para esta ordem
+        order = GPWorkOrder.query.filter_by(serial=serial).first()
+        if order:
+            stage_b5 = GPWorkStage.query.filter_by(
+                order_id=order.id, bench_id="b5", finished_at=None
+            ).first()
+            if stage_b5:
+                stage_b5.result = status
+                stage_b5.rework_flag = (status == "REP")
+                stage_b5.finished_at = started_at
+                db.session.add(stage_b5)
+
+        # 5. Aplicar o resultado global e avançar o fluxo
+        res_dict = aplicar_resultado_hipot({
+            "serial": serial,
+            "status": status,
+            "received_at": started_at.isoformat()
+        })
+
+        return jsonify({
+            "ok": True,
+            "serial": res_dict["serial"],
+            "hipot_status": res_dict["hipot_status"],
+            "hipot_flag": res_dict["hipot_flag"],
+            "hipot_last_at": res_dict["hipot_last_at"],
+            "final_ok": final_ok
+        })
+
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
+        db.session.rollback()
+        return jsonify({"ok": False, "error": f"Erro ao aplicar resultado no fluxo: {str(e)}"}), 500
 
 
 # ====================================================================
@@ -522,6 +664,50 @@ def hipot_painel_submit():
 
 # ====================================================================
 # [FIM BLOCO] hipot_painel_submit
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] hipot_collector_launch
+# [RESPONSABILIDADE] Executar o script collector.py localmente com argumento serial
+# ====================================================================
+@gp_hipot_bp.route("/api/launch", methods=["POST"])
+def hipot_collector_launch():
+    try:
+        import subprocess
+        import sys
+        import os
+
+        data = request.get_json(force=True, silent=True) or {}
+        serial = (data.get("serial") or "").strip()
+
+        # Determina o diretório absoluto do coletor
+        basedir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+        collector_dir = os.path.join(basedir, "collector_hipot_post")
+        collector_script = os.path.join(collector_dir, "collector.py")
+
+        if not os.path.exists(collector_script):
+            return jsonify({"ok": False, "error": f"Arquivo {collector_script} não encontrado."}), 404
+
+        python_bin = sys.executable
+        args = [python_bin, collector_script]
+        if serial:
+            args.append(serial)
+
+        # Inicia o processo em background
+        subprocess.Popen(
+            args,
+            cwd=collector_dir,
+            creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0
+        )
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ====================================================================
+# [FIM BLOCO] hipot_collector_launch
 # ====================================================================
 
 # ====================================================================

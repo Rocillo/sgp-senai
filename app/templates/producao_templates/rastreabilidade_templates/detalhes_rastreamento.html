@@ -432,7 +432,8 @@
 
   function statusLabel(st){
     const s = (st||'').toLowerCase();
-    if(s==='done' || s==='ok' || s==='apr' || s==='aprovado') return chip('APROVADO','success');
+    if(s==='done') return chip('CONCLUÍDO','success');
+    if(s==='ok' || s==='apr' || s==='aprovado') return chip('APROVADO','success');
     if(s==='in_progress') return chip('EM ANDAMENTO','warning');
     if(s==='queued') return chip('EM FILA','neutral');
     if(s==='reprovado' || s==='rejected' || s==='rep' || s==='fail') return chip('REPROVADO','danger');

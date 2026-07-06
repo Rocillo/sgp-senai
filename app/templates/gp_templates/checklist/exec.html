@@ -80,11 +80,11 @@
     <div class="meta">
       <div>
         <label><b>Serial</b></label>
-        <input id="inpSerial" placeholder= "Ler ou digitar serial" />
+        <input id="serial" placeholder= "Ler ou digitar serial" />
       </div>
       <div>
         <label><b>Modelo</b></label>
-        <select id="selModelo">
+        <select id="modeloInfo">
           <option value="PM700">PM700</option>
           <option value="PM2100">PM2100</option>
           <option value="PM2200">PM2200</option>
@@ -92,7 +92,7 @@
       </div>
       <div>
         <label><b>Operador</b></label>
-        <input id="inpOperador" placeholder="Nome do operador" />
+        <input id="operador" placeholder="Nome do operador" value="{{ current_user.username if (current_user and current_user.is_authenticated) else '' }}" />
       </div>
       <div>
         <label><b>Tolerância início</b></label>
@@ -109,7 +109,7 @@
   <div class="card">
     <h3>Execução</h3>
     <div id="execStatus" class="status-badge status-open">Checklist aberto</div>
-    <div class="items" id="items"></div>
+    <div class="items" id="lista"></div>
     <div class="footer">
       <button class="btn primary" id="btnFinalizar" disabled>Finalizar checklist</button>
     </div>
@@ -144,6 +144,9 @@
   </div>
 </div>
 
+<script>
+  window.loggedInUser = "{{ current_user.username if (current_user and current_user.is_authenticated) else '' }}";
+</script>
 <script src="{{ url_for('static', filename='js/gp_checklist/exec.js') }}"></script>
 {% endblock %}
 <!-- ====================================================================

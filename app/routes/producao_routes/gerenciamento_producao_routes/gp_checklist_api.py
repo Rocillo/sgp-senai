@@ -314,23 +314,27 @@ def upsert_template():
     )
     now = datetime.utcnow()
     if not tpl:
-        tpl = ChecklistTemplate(
-            # model_code=modelo if hasattr(ChecklistTemplate, "model_code") else None,
-            modelo=modelo if hasattr(ChecklistTemplate, "modelo") else None,
-            tolerancia_inicio=(
-                tol if hasattr(ChecklistTemplate, "tolerancia_inicio") else None
-            ),
-            permitir_pular_item=(
-                permitir_pular
-                if hasattr(ChecklistTemplate, "permitir_pular_item")
-                else None
-            ),
-            created_at=now if hasattr(ChecklistTemplate, "created_at") else None,
-            updated_at=now if hasattr(ChecklistTemplate, "updated_at") else None,
-        )
+        tpl_kwargs = {}
+        if hasattr(ChecklistTemplate, "modelo"):
+            tpl_kwargs["modelo"] = modelo
+        if hasattr(ChecklistTemplate, "model_code"):
+            tpl_kwargs["model_code"] = modelo
+        if hasattr(ChecklistTemplate, "tolerancia_inicio"):
+            tpl_kwargs["tolerancia_inicio"] = tol
+        if hasattr(ChecklistTemplate, "permitir_pular_item"):
+            tpl_kwargs["permitir_pular_item"] = permitir_pular
+        if hasattr(ChecklistTemplate, "created_at"):
+            tpl_kwargs["created_at"] = now
+        if hasattr(ChecklistTemplate, "updated_at"):
+            tpl_kwargs["updated_at"] = now
+        tpl = ChecklistTemplate(**tpl_kwargs)
         db.session.add(tpl)
         db.session.flush()
     else:
+        if hasattr(tpl, "modelo"):
+            tpl.modelo = modelo
+        if hasattr(tpl, "model_code"):
+            tpl.model_code = modelo
         if hasattr(tpl, "tolerancia_inicio"):
             tpl.tolerancia_inicio = tol
         if hasattr(tpl, "permitir_pular_item"):
@@ -414,17 +418,20 @@ def salvar_execucao():
     started_at = _parse_iso(data.get("started_at")) or datetime.utcnow()
     finished_at = _parse_iso(data.get("finished_at"))
 
-    status = (data.get("status") or "").strip().lower() or None
+    status = (data.get("status") or data.get("result") or "").strip().lower() or None
+    if status == "nok":
+        status = "fail"
+
     if status not in (None, "ok", "fail"):
         return _err("Status da execução inválido (use 'ok' ou 'fail').", 400)
 
     # 2. Validação dos Itens do Checklist
-    itens = data.get("itens") or []
+    itens = data.get("itens") or data.get("items") or []
     if not isinstance(itens, list):
         return _err("Itens inválidos (esperado lista).", 400)
 
     for i, it in enumerate(itens, start=1):
-        resultado = (it.get("resultado") or "").strip().lower()
+        resultado = (it.get("resultado") or it.get("status") or "").strip().lower()
 
         # ✅ Validação do tipo de resultado (incluindo retrabalho)
         if resultado not in ("ok", "nao", "retrabalho"):
@@ -434,7 +441,7 @@ def salvar_execucao():
 
         # ✅ tempo_alvo_s é obrigatório (DB: tempo_estimado_seg é NOT NULL)
         try:
-            tempo_alvo_s = int(it.get("tempo_alvo_s"))
+            tempo_alvo_s = int(it.get("tempo_alvo_s") or it.get("tempo_estimado_seg") or it.get("tempo_seg") or 0)
             if tempo_alvo_s <= 0:
                 raise ValueError()
         except Exception:
@@ -471,13 +478,14 @@ def salvar_execucao():
         finished_item = _parse_iso(it.get("finished_at"))
 
         try:
-            elapsed = (
-                int(it.get("elapsed_s")) if it.get("elapsed_s") is not None else None
-            )
+            elapsed_val = it.get("elapsed_s")
+            if elapsed_val is None:
+                elapsed_val = it.get("elapsed_seg")
+            elapsed = int(elapsed_val) if elapsed_val is not None else None
         except Exception:
             elapsed = None
 
-        resultado = (it.get("resultado") or "").strip().lower()
+        resultado = (it.get("resultado") or it.get("status") or "").strip().lower()
 
         # NCRs (mantém compatível com o front atual, se enviar)
         ncrs_data = []
@@ -486,7 +494,7 @@ def salvar_execucao():
                 {
                     "categoria": (n.get("categoria") or "").strip()[:80],
                     "descricao": (n.get("descricao") or "").strip()[:1000],
-                    "foto_path": n.get("foto_path"),
+                    "foto_path": n.get("foto_path") or n.get("fotoDataUrl"),
                     "created_at": datetime.utcnow().isoformat(),
                 }
             )
@@ -506,7 +514,7 @@ def salvar_execucao():
             exec_id=exec_.id,
             ordem=ordem,
             descricao=desc,
-            tempo_estimado_seg=int(it.get("tempo_alvo_s")),
+            tempo_estimado_seg=int(it.get("tempo_alvo_s") or it.get("tempo_estimado_seg") or it.get("tempo_seg") or 0),
             status=resultado,  # agora aceita: ok | nao | retrabalho
             started_at=started_item,
             finished_at=finished_item,
@@ -520,7 +528,7 @@ def salvar_execucao():
     # 5. Se não veio status, inferir pelo conjunto dos itens
     if status is None and hasattr(exec_, "result"):
         any_fail = any(
-            (str((it.get("resultado") or "")).strip().lower() in ("nao", "retrabalho"))
+            (str((it.get("resultado") or it.get("status") or "")).strip().lower() in ("nao", "retrabalho"))
             for it in itens
         )
         exec_.result = "fail" if any_fail else "ok"

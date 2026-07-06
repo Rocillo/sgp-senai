@@ -774,10 +774,15 @@
     <form id="hipotForm">
       <input type="hidden" id="hipotSerialInput" name="serial">
 
+      <!-- Launch button for desktop collector app -->
+      <button type="button" class="btn" id="btnLaunchCollector" style="background:#0d6efd; border-color:#0d6efd; width:100%; margin-bottom:15px; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+        🔌 Abrir Coletor Desktop (Hi-Pot)
+      </button>
+
       <div style="margin-bottom: 12px;">
         <label for="operadorId" style="display: block; margin-bottom: 5px; font-size: 14px;">Operador/ID:</label>
         <input type="text" id="operadorId" name="operadorId" required class="input-field" placeholder="ID do Operador"
-          autocomplete="off">
+          autocomplete="off" value="{{ current_user.username if (current_user and current_user.is_authenticated) else '' }}">
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
@@ -857,7 +862,8 @@
                required
                class="input-field"
                placeholder="ID do Operador"
-               autocomplete="off">
+               autocomplete="off"
+               value="{{ current_user.username if (current_user and current_user.is_authenticated) else '' }}">
       </div>
 
       <!-- Banner de status do timer ativo -->
@@ -974,6 +980,7 @@
     const tensaoInput = document.getElementById('tensaoSuportavel');
     const aterramentoInput = document.getElementById('continuidadeAterramento');
     const resultButtons = document.querySelectorAll('#hipotModal .btn-result');
+    const btnLaunchCollector = document.getElementById('btnLaunchCollector');
 
     let selectedResult = null;
     let lastData = null;
@@ -1133,8 +1140,9 @@
       tensaoInput.value = '';
       aterramentoInput.value = '';
 
+      const loggedInUser = "{{ current_user.username if (current_user and current_user.is_authenticated) else '' }}";
       const lastOperator = localStorage.getItem('gp.hipot.operador');
-      operadorIdInput.value = lastOperator || '';
+      operadorIdInput.value = loggedInUser || lastOperator || '';
 
       selectedResult = null;
       hipotSubmitBtn.disabled = true;
@@ -1215,10 +1223,13 @@
       if (serialInput) serialInput.value = s;
       if (checklistSerialDisplay) checklistSerialDisplay.textContent = s;
 
-      // Operador: reaproveita último operador do Hi-Pot, se houver
+      // Operador: reaproveita loggedInUser do Jinja ou último operador do Hi-Pot do localStorage
       try {
+        const loggedInUser = "{{ current_user.username if (current_user and current_user.is_authenticated) else '' }}";
         const lastOperator = localStorage.getItem('gp.hipot.operador');
-        if (operadorInput && !operadorInput.value) operadorInput.value = lastOperator || '';
+        if (operadorInput) {
+          operadorInput.value = loggedInUser || lastOperator || '';
+        }
       } catch (e) {}
 
       checklistItemsContainer.innerHTML = 'Carregando itens...';
@@ -1710,6 +1721,45 @@ function liberarChecklistItem(index) {
         hipotSubmitBtn.disabled = false;
       }
     });
+
+    if (btnLaunchCollector) {
+      btnLaunchCollector.addEventListener('click', async () => {
+        const serial = hipotSerialInput.value;
+        if (!serial) {
+          showToast('Atenção', 'Número de Série não selecionado.', 'warn', 3000);
+          return;
+        }
+
+        btnLaunchCollector.disabled = true;
+        btnLaunchCollector.textContent = '🔌 Abrindo coletor...';
+
+        try {
+          const r = await fetch('/producao/gp/hipot/api/launch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ serial: serial })
+          });
+
+          if (!r.ok) {
+            const txt = await r.text();
+            showToast('Erro ao iniciar', `Servidor retornou status ${r.status}: ${txt.substring(0, 100)}`, 'error', 7000);
+            return;
+          }
+
+          const d = await r.json();
+          if (d.ok) {
+            showToast('Sucesso', 'Coletor elétrico iniciado na máquina.', 'success', 4000);
+          } else {
+            showToast('Erro ao iniciar', d.error || 'Falha ao executar coletor.', 'error', 7000);
+          }
+        } catch (e) {
+          showToast('Erro de Rede', `Não foi possível enviar comando para o servidor local: ${e.message || e}`, 'error', 7000);
+        } finally {
+          btnLaunchCollector.disabled = false;
+          btnLaunchCollector.textContent = '🔌 Abrir Coletor Desktop (Hi-Pot)';
+        }
+      });
+    }
 
     hipotModalBackdrop.addEventListener('click', (e) => {
       if (e.target === hipotModalBackdrop) closeHipotModal();

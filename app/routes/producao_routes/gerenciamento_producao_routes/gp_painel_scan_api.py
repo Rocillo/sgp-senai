@@ -500,6 +500,9 @@ def _flow_advance_after_finish(session, serial: str) -> Dict[str, str]:
         # Aqui ele usa _next_bench_for_order que já pula as inativas
         nxt = _next_bench_for_order(order, order.current_bench)
         order.current_bench = nxt
+        order.status = "done" if nxt == "final" else "in_progress"
+        if nxt == "final" and getattr(order, "finished_at", None) is None:
+            order.finished_at = datetime.utcnow()
         session.commit()
         return {"ok": "true", "current_bench": nxt, "fallback": True}
 
@@ -689,7 +692,8 @@ def scan_generic():
                 # VERIFICAÇÃO DE FIM DE PROCESSO E BAIXA DE ESTOQUE
                 # ========================================================
                 if order.current_bench == "final":
-                    # 1. Marca hora final na ordem
+                    # 1. Marca hora final na ordem e status como done
+                    order.status = "done"
                     if getattr(order, "finished_at", None) is None:
                         order.finished_at = datetime.utcnow()
 

@@ -90,6 +90,10 @@
   // [NOME] Handlers de eventos (bootstrap)
   // [RESPONSABILIDADE] Registrar listeners para inputs, botões e fluxos de UI
   // ====================================================================
+  if (elOperador && typeof window.loggedInUser !== 'undefined' && window.loggedInUser) {
+    elOperador.value = window.loggedInUser;
+  }
+
   // ====== Eventos ======
   elSerial.addEventListener("change", tryLoadBySerial);
   elSerial.addEventListener("keydown", (e) => { if (e.key === "Enter") tryLoadBySerial(); });
@@ -555,7 +559,7 @@
     elLista.innerHTML = "";
     elModeloInfo.value = "";
     elSerial.value = "";
-    elOperador.value = "";
+    elOperador.value = (typeof window.loggedInUser !== 'undefined' && window.loggedInUser) ? window.loggedInUser : "";
     elSerial.disabled = false;
     elOperador.disabled = false;
     elBtnFinalizar.disabled = true;
