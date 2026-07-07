@@ -60,7 +60,17 @@ O objetivo deste ciclo de desenvolvimento foi **conectar as duas bases de dados*
 - **Comando de Inicialização via API**: Criação da rota `/api/launch` no backend Flask (`hipot_routes.py`) que usa `subprocess.Popen` para inicializar em segundo plano a aplicação PySide6 no Windows host local.
 - **Pré-preenchimento Automático do Serial**: Configuração do construtor de `HipotWindow` em `gui.py` para receber parâmetros de linha de comando (`sys.argv`). Ao clicar no botão no SGP, o número de série da peça atual é passado como argumento e pré-preenchido automaticamente na tela do coletor desktop.
 
-### E. Outros Ajustes Operacionais
+### E. Melhorias e Integração de Checklist (Bancada B8 e Kanban)
+- **Campos de Controle de Tempo**: Adicionado suporte para os campos `min_s` (tempo mínimo em segundos) e `max_s` (tempo máximo em segundos) nos itens do checklist (`app/static/js/gp_checklist/exec.js`). 
+- **Desbloqueio com Tempo Mínimo**: A conclusão dos itens do checklist agora respeita o campo `min_s` de forma que o botão de aprovação/reprovação permaneça desabilitado até que o tempo mínimo de teste configurado para a tarefa tenha decorrido.
+- **Banner de Status no Modal**: Inclusão de um banner persistente de status de execução (`#checklistActiveTimerBanner`) no topo do checklist modal (`board.html`), mostrando contagens regressivas de tempo mínimo e feedback visual sobre o estado atual do teste (ex: aguardando tempo mínimo, tarefa liberada, checklist concluído).
+- **Integração com Fluxo Kanban (Bancada B8)**: O salvamento das execuções de checklist (`gp_checklist_api.py`) foi integrado ao fluxo do painel SGP:
+  - Cria/atualiza e encerra a etapa `GPWorkStage` na bancada B8 com o resultado do checklist (`APR` ou `REP`).
+  - Avança a ordem de produção para a etapa subsequente utilizando o serviço `advance_after_finish`.
+  - Conclui a ordem de produção definindo o status como `done` caso a próxima etapa seja a finalização, registrando a saída do produto acabado no controle de estoque.
+- **Tratamento Amigável de Erros**: Implementação da função `friendlyErrorText` no frontend para mapear falhas de comunicação e erros de validação de dados em mensagens claras e localizadas ao operador.
+
+### F. Outros Ajustes Operacionais
 - **Codificação de Dependências**: Conversão do arquivo `requirements.txt` da raiz do projeto SGP de **UTF-16LE** para **UTF-8**, resolvendo incompatibilidades com ferramentas de build e automações.
 
 ---
