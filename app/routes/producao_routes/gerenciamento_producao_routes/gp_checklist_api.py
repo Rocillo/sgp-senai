@@ -714,11 +714,11 @@ def get_checklist_items(modelo: str):
     )
 
     if not template:
-        print("❌ Modelo não encontrado:", repr(modelo))
+        print("[CHECKLIST] Modelo nao encontrado:", repr(modelo))
         return []
 
-    # 🔥 PRINT DO ID E MODELO
-    print(f"✅ TEMPLATE ENCONTRADO | id={template.id} | modelo='{template.modelo}'")
+    # PRINT DO ID E MODELO
+    print(f"[CHECKLIST] TEMPLATE ENCONTRADO | id={template.id} | modelo='{template.modelo}'")
 
     # 2) Busca os itens do template
     items = (
@@ -728,7 +728,7 @@ def get_checklist_items(modelo: str):
         .all()
     )
 
-    print(f"📦 ITENS ENCONTRADOS: {len(items)}")
+    print(f"[CHECKLIST] ITENS ENCONTRADOS: {len(items)}")
 
     # 3) Serializa
     return [

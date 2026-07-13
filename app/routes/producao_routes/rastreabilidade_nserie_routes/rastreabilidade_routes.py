@@ -96,16 +96,21 @@ except Exception:
 # HiPot (preferir GPHipotRun; cair para GPHipotResult)
 GPHipotRun = None  # type: ignore
 try:
-    from app.models.producao_models.gp_hipot import GPHipotRun as _HR  # type: ignore
+    from app.models.producao_models.gp_models.gp_hipot import GPHipotRun as _HR  # type: ignore
 
     GPHipotRun = _HR
 except Exception:
     try:
-        from app.models.producao_models.gp_hipot import GPHipotResult as _HR  # type: ignore
+        from app.models.producao_models.gp_hipot import GPHipotRun as _HR  # type: ignore
 
         GPHipotRun = _HR
     except Exception:
-        pass
+        try:
+            from app.models_sqla import GPHipotRun as _HR  # type: ignore
+
+            GPHipotRun = _HR
+        except Exception:
+            pass
 # ====================================================================
 # [FIM BLOCO] GPHipotRun
 # ====================================================================
@@ -159,8 +164,8 @@ except Exception:
 if GPChecklistExecution is None or GPChecklistExecutionItem is None:
     try:
         from app.models_sqla import (
-            GPChecklistExecucao as _CE,
-            GPChecklistExecItem as _CEI,
+            GPChecklistExecution as _CE,
+            GPChecklistExecutionItem as _CEI,
             GPChecklistTemplate as _CT,
             GPChecklistItem as _CI,
         )
@@ -292,16 +297,17 @@ def _end_of_day(dt: datetime) -> datetime:
 # ====================================================================
 
 
-# ====================================================================
-# [BLOCO] FUNÇÃO
-# [NOME] _fmt_dt_iso
-# [RESPONSABILIDADE] Formatar datetime em ISO de forma segura
-# ====================================================================
 def _fmt_dt_iso(dt: Optional[datetime]) -> Optional[str]:
+    from zoneinfo import ZoneInfo
+    tz_local = ZoneInfo("America/Sao_Paulo")
+    tz_utc = ZoneInfo("UTC")
     if not dt:
         return None
     try:
-        return dt.isoformat()
+        # Se for naive, assume que está em UTC e converte para local
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=tz_utc)
+        return dt.astimezone(tz_local).isoformat()
     except Exception:
         return str(dt)
 
@@ -533,20 +539,25 @@ def rastreabilidade_api_detalhe(serial: str):
     if not work_order:
         return jsonify({"ok": False, "error": "Número de série não encontrado."}), 404
 
+    # GPWorkOrder não tem coluna started_at — usa created_at como início de produção
+    _wo_created  = getattr(work_order, "created_at", None)
+    _wo_finished = getattr(work_order, "finished_at", None)
+
     payload: Dict[str, Any] = {
         "serial": getattr(work_order, "serial", None),
         "modelo": getattr(work_order, "modelo", None),
         "lote": getattr(work_order, "lote", None),
         "ordem_producao": getattr(work_order, "id", None),
-        "criado_em": _fmt_dt_iso(getattr(work_order, "created_at", None)),
+        "criado_em": _fmt_dt_iso(_wo_created),
         "criado_por": getattr(work_order, "created_by", None),
         "status": getattr(work_order, "status", None),
         "status_atual": getattr(work_order, "status", None),
         "current_bench": getattr(work_order, "current_bench", None),
         "ultima_atualizacao": _fmt_dt_iso(getattr(work_order, "updated_at", None)),
-        # compat (não quebra se não existir)
-        "started_at": _fmt_dt_iso(getattr(work_order, "started_at", None)),
-        "finished_at": _fmt_dt_iso(getattr(work_order, "finished_at", None)),
+        # started_at = created_at (ordem de produção não rastreia horário de início separado)
+        "started_at": _fmt_dt_iso(_wo_created),
+        "finished_at": _fmt_dt_iso(_wo_finished),
+        "duracao_min": _safe_int_minutes(_wo_created, _wo_finished),
     }
 
     # Bancadas
@@ -601,6 +612,10 @@ def rastreabilidade_api_detalhe(serial: str):
                 "fim": _fmt_dt_iso(finished_at),
                 "duracao_min": _safe_int_minutes(started_at, finished_at),
                 "responsavel": getattr(stg, "operador", None) if stg else None,
+                "workstation": getattr(stg, "workstation", None) if stg else None,
+                "resultado": getattr(stg, "result", None) if stg else None,
+                "observacoes": getattr(stg, "observacoes", None) if stg else None,
+                "rework_flag": getattr(stg, "rework_flag", False) if stg else False,
                 "ocorrencias": [],
             }
         )
@@ -608,14 +623,24 @@ def rastreabilidade_api_detalhe(serial: str):
     # HiPot — último run
     if GPHipotRun is not None:
         try:
+            from sqlalchemy import desc as _desc, nullslast
             last_hipot = (
                 db.session.query(GPHipotRun)
                 .filter(getattr(GPHipotRun, "serial") == str(serial))
-                .order_by(getattr(GPHipotRun, "started_at").desc())
+                .order_by(nullslast(_desc(getattr(GPHipotRun, "started_at"))), _desc(getattr(GPHipotRun, "id")))
                 .first()
             )
         except Exception:
-            last_hipot = None
+            try:
+                # Fallback simples: pegar o mais recente por id
+                last_hipot = (
+                    db.session.query(GPHipotRun)
+                    .filter(getattr(GPHipotRun, "serial") == str(serial))
+                    .order_by(getattr(GPHipotRun, "id").desc())
+                    .first()
+                )
+            except Exception:
+                last_hipot = None
     else:
         last_hipot = None
 
@@ -627,6 +652,17 @@ def rastreabilidade_api_detalhe(serial: str):
             "executado": True,
             "equipamento": getattr(last_hipot, "equipamento", None),
             "calibracao": getattr(last_hipot, "calibracao", None),
+            "responsavel": getattr(last_hipot, "responsavel", None) or getattr(last_hipot, "operador", None),
+            "started_at": _fmt_dt_iso(getattr(last_hipot, "started_at", None)),
+            "finished_at": _fmt_dt_iso(getattr(last_hipot, "finished_at", None)),
+            "gb_r_mohm": getattr(last_hipot, "gb_r_mohm", None) or getattr(last_hipot, "gb_r_mohms", None),
+            "gb_i_a": getattr(last_hipot, "gb_i_a", None),
+            "gb_t_s": getattr(last_hipot, "gb_t_s", None),
+            "gb_ok": gb_ok,
+            "hp_v_obs_v": getattr(last_hipot, "hp_v_obs_v", None) or getattr(last_hipot, "hp_v", None),
+            "hp_ileak_ma": getattr(last_hipot, "hp_ileak_ma", None),
+            "hp_t_s": getattr(last_hipot, "hp_t_s", None),
+            "hp_ok": hp_ok,
             "gb1": {
                 "valor": (
                     getattr(last_hipot, "gb_r_mohms", None)
@@ -646,7 +682,7 @@ def rastreabilidade_api_detalhe(serial: str):
             "resultado_final": (
                 "ok" if final_ok else "nao" if final_ok is not None else None
             ),
-            "observacao_reprovacao": getattr(last_hipot, "observacoes", None),
+            "observacao_reprovacao": getattr(last_hipot, "obs", None) or getattr(last_hipot, "observacoes", None),
         }
     else:
         payload["hipot"] = {
@@ -924,6 +960,13 @@ def rastreabilidade_api_detalhe(serial: str):
                     )
                     status_norm = _norm_check_result(st_raw)
 
+                    elapsed_seg = getattr(it, "elapsed_seg", None)
+                    if elapsed_seg is None and getattr(it, "started_at", None) and getattr(it, "finished_at", None):
+                        try:
+                            elapsed_seg = int((it.finished_at - it.started_at).total_seconds())
+                        except Exception:
+                            pass
+
                     itens_out.append(
                         {
                             "ordem": int(ordem),
@@ -931,6 +974,7 @@ def rastreabilidade_api_detalhe(serial: str):
                             "status": status_norm,
                             "observacao": _extract_item_observacao(it),
                             "ncrs": _safe_json_list(getattr(it, "ncrs", None)),
+                            "elapsed_seg": elapsed_seg,
                         }
                     )
 

@@ -58,8 +58,14 @@
     .flash-container,
     nav,
     .btn,
-    .no-print {
+    .no-print,
+    .sgp-sidebar {
       display: none !important;
+    }
+
+    .sgp-content-wrap {
+      margin-left: 0 !important;
+      padding: 0 !important;
     }
 
     /* ----------------------------------------------------------------
@@ -459,10 +465,16 @@
 
       // Dados gerais
       dadosGerais.innerHTML = `
+        <div class="kv-item"><strong>Nº de Série</strong><span style="font-family:monospace;">${d.serial||'-'}</span></div>
+        <div class="kv-item"><strong>Modelo</strong>${d.modelo||'-'}</div>
+        <div class="kv-item"><strong>Ordem de Produção</strong>${d.ordem_producao||'-'}</div>
+        <div class="kv-item"><strong>Lote</strong>${d.lote||'-'}</div>
         <div class="kv-item"><strong>Início da Produção</strong>${fmt(d.started_at)}</div>
         <div class="kv-item"><strong>Fim da Produção</strong>${fmt(d.finished_at)}</div>
-        <div class="kv-item"><strong>Tempo Total</strong>${d.duracao_min ?? '-'} min</div>
+        <div class="kv-item"><strong>Tempo Total</strong>${d.duracao_min != null ? d.duracao_min + ' min' : '-'}</div>
         <div class="kv-item"><strong>Status</strong>${statusLabel(d.status)}</div>
+        ${d.criado_por ? `<div class="kv-item"><strong>Criado Por</strong>${d.criado_por}</div>` : ''}
+        ${d.ultima_atualizacao ? `<div class="kv-item"><strong>Última Atualização</strong>${fmt(d.ultima_atualizacao)}</div>` : ''}
       `;
 
       // Bancadas (Timeline)
@@ -471,15 +483,24 @@
       }else{
         const list = d.bancadas.map(b => {
           const oc = (b.ocorrencias||[]).length ? ` <span style="color:#ef4444">• ${b.ocorrencias.length} Ocorrência(s)</span>` : '';
+          
+          const extraInfo = [];
+          if (b.workstation) extraInfo.push(`Posto: <strong>${b.workstation}</strong>`);
+          if (b.resultado) extraInfo.push(`Resultado: ${statusLabel(b.resultado)}`);
+          if (b.rework_flag) extraInfo.push(`<span class="chip warning" style="font-size:10px; padding: 1px 6px;">RETRABALHO</span>`);
+          const extraStr = extraInfo.length ? ` • ${extraInfo.join(' • ')}` : '';
+          const obsStr = b.observacoes ? `<div style="font-size:0.8rem; color:#b91c1c; margin-top:2px;">📝 <strong>Obs:</strong> ${b.observacoes}</div>` : '';
+
           return `
             <div class="timeline-item ${b.fim ? '' : 'active'}">
               <div style="font-weight:700; color:#1e293b;">${b.nome || ('Bancada ' + (b.bench_id||''))}</div>
               <div style="font-size:0.85rem; color:#64748b;">
-                Início: ${fmt(b.inicio)} • Fim: ${fmt(b.fim)} • <strong>${b.duracao_min ?? '-'} min</strong>
+                Início: ${fmt(b.inicio)} • Fim: ${fmt(b.fim)} • Duração: <strong>${b.duracao_min ?? '-'} min</strong>${extraStr}
               </div>
               <div style="font-size:0.85rem; color:#475569; margin-top:2px;">
                 Responsável: ${b.responsavel || '-'} ${oc}
               </div>
+              ${obsStr}
             </div>
           `;
         }).join('');
@@ -495,11 +516,28 @@
           <div class="kv-grid">
             <div class="kv-item"><strong>Equipamento</strong>${h.equipamento || '-'}</div>
             <div class="kv-item"><strong>Calibração</strong>${h.calibracao || '-'}</div>
+            <div class="kv-item"><strong>Responsável</strong>${h.responsavel || h.operador || '-'}</div>
             <div class="kv-item"><strong>Resultado Final</strong>${statusLabel(h.resultado_final)}</div>
           </div>
-          <div style="margin-top:12px; display:flex; gap:20px; flex-wrap:wrap; background:#f8fafc; padding:10px; border-radius:8px;">
-            <div><strong>GB:</strong> ${h.gb1?.valor || '-'} ${statusLabel(h.gb1?.status)}</div>
-            <div><strong>HP:</strong> ${h.hp1?.valor || '-'} ${statusLabel(h.hp1?.status)}</div>
+          <div style="margin-top:12px; display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px; background:#f8fafc; padding:12px; border-radius:8px; border: 1px solid #e2e8f0;">
+            <div>
+              <h4 style="margin: 0 0 6px 0; font-size: 0.9rem; color:#1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom:4px;">⚡ Teste Ground Bond (GB)</h4>
+              <div style="font-size:0.85rem; color:#475569; line-height: 1.4;">
+                <div>Resistência: <strong>${h.gb_r_mohm !== null ? h.gb_r_mohm + ' mΩ' : '-'}</strong></div>
+                <div>Corrente: <strong>${h.gb_i_a !== null ? h.gb_i_a + ' A' : '-'}</strong></div>
+                <div>Tempo: <strong>${h.gb_t_s !== null ? h.gb_t_s + ' s' : '-'}</strong></div>
+                <div style="margin-top:4px;">Resultado GB: ${statusLabel(h.gb_ok ? 'ok' : h.gb_ok === false ? 'nao' : 'não informado')}</div>
+              </div>
+            </div>
+            <div>
+              <h4 style="margin: 0 0 6px 0; font-size: 0.9rem; color:#1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom:4px;">⚡ Teste HiPot (HP)</h4>
+              <div style="font-size:0.85rem; color:#475569; line-height: 1.4;">
+                <div>Tensão Aplicada: <strong>${h.hp_v_obs_v !== null ? h.hp_v_obs_v + ' V' : '-'}</strong></div>
+                <div>Corrente de Fuga: <strong>${h.hp_ileak_ma !== null ? h.hp_ileak_ma + ' mA' : '-'}</strong></div>
+                <div>Tempo: <strong>${h.hp_t_s !== null ? h.hp_t_s + ' s' : '-'}</strong></div>
+                <div style="margin-top:4px;">Resultado HP: ${statusLabel(h.hp_ok ? 'ok' : h.hp_ok === false ? 'nao' : 'não informado')}</div>
+              </div>
+            </div>
           </div>
           ${h.observacao_reprovacao ? `<div style="margin-top:10px; color:#b91c1c; font-size:0.85rem;"><strong>Obs:</strong> ${h.observacao_reprovacao}</div>` : ''}
         `;
@@ -527,11 +565,15 @@
           const obs = it.observacao ? `<div class="check-meta" style="color:#475569; margin-top:4px;">📝 <strong>Obs:</strong> ${it.observacao}</div>` : '';
           const ncrs = (it.ncrs || []).map(n => `<div class="check-meta" style="color:#b91c1c; margin-top:2px;">⚠️ <strong>NCR:</strong> ${n.descricao || n.texto || n}</div>`).join('');
           
+          const elapsed = it.elapsed_seg !== null && it.elapsed_seg !== undefined
+            ? ` <span style="font-size:0.8rem; color:#64748b; font-weight:normal; margin-left:8px;">⏱️ ${it.elapsed_seg >= 60 ? Math.floor(it.elapsed_seg / 60) + 'm ' + (it.elapsed_seg % 60) + 's' : it.elapsed_seg + 's'}</span>`
+            : '';
+
           return `
             <div class="check-item">
               <div class="check-ordem">${it.ordem || ''}</div>
               <div class="check-content">
-                <div class="check-desc">${it.desc || it.descricao || '-'}</div>
+                <div class="check-desc">${it.desc || it.descricao || '-'}${elapsed}</div>
                 ${obs}
                 ${ncrs}
               </div>
@@ -546,12 +588,17 @@
             <details class="no-print" style="margin-top:20px; border-top:1px dashed #cbd5e1; padding-top:15px;">
               <summary style="cursor:pointer; color:#3b82f6; font-weight:600; font-size:0.9rem;">Ver histórico de reexecuções (${execs.length - 1})</summary>
               ${execs.slice(0, -1).reverse().map((ex, idx) => {
-                const exItems = (ex.itens || []).map(it => `
-                  <div style="font-size:0.8rem; padding:4px 0; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between;">
-                    <span>${it.ordem}. ${it.desc || it.descricao}</span>
-                    <span>${statusLabel(it.status)}</span>
-                  </div>
-                `).join('');
+                const exItems = (ex.itens || []).map(it => {
+                  const elapsedEx = it.elapsed_seg !== null && it.elapsed_seg !== undefined
+                    ? ` <span style="font-size:0.75rem; color:#64748b;">⏱️ ${it.elapsed_seg >= 60 ? Math.floor(it.elapsed_seg / 60) + 'm ' + (it.elapsed_seg % 60) + 's' : it.elapsed_seg + 's'}</span>`
+                    : '';
+                  return `
+                    <div style="font-size:0.8rem; padding:4px 0; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center;">
+                      <span>${it.ordem}. ${it.desc || it.descricao}${elapsedEx}</span>
+                      <span>${statusLabel(it.status)}</span>
+                    </div>
+                  `;
+                }).join('');
 
                 return `
                   <div class="exec-box" style="margin-top:10px;">

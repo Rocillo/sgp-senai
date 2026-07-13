@@ -936,7 +936,7 @@
                         <div class="timeline-item-body">
                             ${event.type === 'work_stage' ? `Bancada: <strong>${event.details?.bench_id ?? '-'}</strong> | Operador: <strong>${event.details?.operador || 'N/A'}</strong>` : ''}
                             ${event.type === 'checklist' ? `Checklist | Itens OK: <strong>${event.details?.items_ok ?? 0}/${event.details?.total_items ?? 0}</strong>` : ''}
-                            ${event.type === 'hipot' ? `HiPot | Tensão: <strong>${event.details?.hp_v ?? '-'}V</strong> | Resultado: <strong>${event.details?.final_ok ? 'OK' : 'NOK'}</strong>` : ''}
+                            ${event.type === 'hipot' ? `HiPot | Tensão: <strong>${event.details?.hp_v ?? '-'}V</strong> | Fuga: <strong>${event.details?.hp_ileak_ma ?? '-'}mA</strong> | GB: <strong>${event.details?.gb_r_mohm ?? '-'}mΩ</strong> | Resultado: <strong>${event.details?.final_ok ? 'APROVADO' : 'REPROVADO'}</strong> | Operador: <strong>${event.details?.responsavel || event.details?.operador || 'N/A'}</strong>` : ''}
                         </div>
                     </div>
                 </div>

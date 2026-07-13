@@ -421,6 +421,9 @@ class GPWorkStage(db.Model):
     rework_flag = db.Column(db.Boolean, nullable=False, server_default="0")
     workstation = db.Column(db.String(120), nullable=True)
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 
 # ====================================================================
 # [FIM BLOCO] GPWorkStage

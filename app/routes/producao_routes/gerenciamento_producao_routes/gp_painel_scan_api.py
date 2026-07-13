@@ -15,8 +15,8 @@ gp_painel_scan_api.py (v6.1 – Revisado)
 # ============================================================
 import re
 import logging
-from typing import Optional, Tuple, List, Dict
-from datetime import datetime, timedelta
+from typing import Optional, Tuple, List, Dict, Any, cast
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, request, jsonify
 from app import db
@@ -69,7 +69,7 @@ def _json_error(
     hint: Optional[str] = None,
     context: Optional[dict] = None,
 ):
-    payload = {"ok": False, "error": error, "message": message}
+    payload: Dict[str, Any] = {"ok": False, "error": error, "message": message}
     if hint:
         payload["hint"] = hint
     if context:
@@ -352,7 +352,7 @@ def _get_last_b5_stage(order_id: int) -> Optional[GPWorkStage]:
 # ====================================================================
 def _open_stage(order: GPWorkOrder, bench_id: str, operador: str = "") -> GPWorkStage:
     stg = GPWorkStage(order_id=order.id, bench_id=bench_id, operador=operador or "")
-    stg.started_at = datetime.utcnow()
+    stg.started_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.session.add(stg)
     order.current_bench = bench_id
     return stg
@@ -369,7 +369,7 @@ def _open_stage(order: GPWorkOrder, bench_id: str, operador: str = "") -> GPWork
 # [RESPONSABILIDADE] Finalizar uma etapa e atualizar current_bench para a próxima conforme roteiro ativo
 # ====================================================================
 def _finish_stage(order: GPWorkOrder, stage: GPWorkStage) -> str:
-    stage.finished_at = datetime.utcnow()
+    stage.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
     next_b = _next_bench_for_order(order, stage.bench_id)
     order.current_bench = next_b
     return next_b
@@ -404,7 +404,7 @@ def _b5_is_locked(order: GPWorkOrder) -> Tuple[bool, Optional[dict]]:
     if getattr(finished_at, "tzinfo", None) is not None:
         finished_at = finished_at.replace(tzinfo=None)
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     delta = now - finished_at
 
     if delta >= timedelta(minutes=REOPEN_LOCK_MIN):
@@ -445,13 +445,13 @@ def _b5_is_locked(order: GPWorkOrder) -> Tuple[bool, Optional[dict]]:
 # [NOME] _flow_set_current_bench_on_scan
 # [RESPONSABILIDADE] Integrar com bench_flow_service para posicionar bancada corrente após scan, com fallback local
 # ====================================================================
-def _flow_set_current_bench_on_scan(session, serial: str, bench: str) -> Dict[str, str]:
+def _flow_set_current_bench_on_scan(session, serial: str, bench: str, operador: Optional[str] = None) -> Dict[str, Any]:
     try:
         from app.services.producao.bench_flow_service import (
             set_current_bench_on_scan as _svc_set,
         )
 
-        return _svc_set(session, serial, bench)
+        return _svc_set(session, serial, bench, operador=operador)
     except Exception as e:
         # Fallback local: posiciona na bancada (respeitando roteiro) e garante etapa
         order = GPWorkOrder.query.filter_by(serial=serial).first()
@@ -468,7 +468,10 @@ def _flow_set_current_bench_on_scan(session, serial: str, bench: str) -> Dict[st
             stg = _find_open_stage(order.id, bench)
             if not stg:
                 stg = GPWorkStage(
-                    order_id=order.id, bench_id=bench, started_at=datetime.utcnow()
+                    order_id=order.id,
+                    bench_id=bench,
+                    started_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                    operador=operador,
                 )
                 session.add(stg)
         session.commit()
@@ -485,7 +488,7 @@ def _flow_set_current_bench_on_scan(session, serial: str, bench: str) -> Dict[st
 # [NOME] _flow_advance_after_finish
 # [RESPONSABILIDADE] Integrar com bench_flow_service para avançar após finalizar etapa, com fallback local
 # ====================================================================
-def _flow_advance_after_finish(session, serial: str) -> Dict[str, str]:
+def _flow_advance_after_finish(session, serial: str) -> Dict[str, Any]:
     try:
         from app.services.producao.bench_flow_service import (
             advance_after_finish as _svc_adv,
@@ -502,7 +505,7 @@ def _flow_advance_after_finish(session, serial: str) -> Dict[str, str]:
         order.current_bench = nxt
         order.status = "done" if nxt == "final" else "in_progress"
         if nxt == "final" and getattr(order, "finished_at", None) is None:
-            order.finished_at = datetime.utcnow()
+            order.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
         session.commit()
         return {"ok": "true", "current_bench": nxt, "fallback": True}
 
@@ -618,7 +621,7 @@ def scan_generic():
             # Debounce da B5
             if bench == "b5":
                 locked, resp_locked = _b5_is_locked(order)
-                if locked:
+                if locked and resp_locked is not None:
                     return _json_ok(**resp_locked)
 
             # Colunas tecnicas nao recebem etapas
@@ -643,10 +646,10 @@ def scan_generic():
                 GPWorkStage.bench_id != bench,
             ).all()
             for st in others:
-                st.finished_at = datetime.utcnow()
+                st.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
             # Sincroniza com BenchFlowService
-            rv_flow = _flow_set_current_bench_on_scan(db.session, serial, bench)
+            rv_flow = _flow_set_current_bench_on_scan(db.session, serial, bench, operador=operador)
             if rv_flow.get("ok") != "true":
                 db.session.rollback()
                 return jsonify(rv_flow), 400
@@ -659,7 +662,12 @@ def scan_generic():
                 new_stage = _open_stage(order, bench, operador)
                 if station:
                     new_stage.workstation = station
-                    db.session.add(new_stage)
+                db.session.add(new_stage)
+            else:
+                if operador and not open_stage.operador:
+                    open_stage.operador = operador
+                if station and not open_stage.workstation:
+                    open_stage.workstation = station
 
             did_start = True
             say += f" Inicio registrado na {bench.upper()}."
@@ -680,6 +688,8 @@ def scan_generic():
                 open_stage.rework_flag = bool(data.get("rework") or False)
                 if station:
                     open_stage.workstation = station
+                if operador and not open_stage.operador:
+                    open_stage.operador = operador
 
                 db.session.add(open_stage)
 
@@ -695,7 +705,7 @@ def scan_generic():
                     # 1. Marca hora final na ordem e status como done
                     order.status = "done"
                     if getattr(order, "finished_at", None) is None:
-                        order.finished_at = datetime.utcnow()
+                        order.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
                     # 2. Dá entrada no produto acabado usando a rotina oficial
                     try:
@@ -708,7 +718,7 @@ def scan_generic():
                             quantidade=1,
                             usuario=operador or "Sistema",
                             referencia=f"GP_FINAL:{order.serial}",
-                            session=db.session,
+                            session=cast(Any, db.session),
                         )
 
                         logger.info(

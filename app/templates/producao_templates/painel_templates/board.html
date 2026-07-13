@@ -846,8 +846,13 @@
 
       <!-- SERIAL -->
       <input type="hidden"
-             id="hipotSerialInput"
+             id="checklistSerialInput"
              name="serial">
+
+      <!-- Launch button for desktop collector app -->
+      <button type="button" class="btn" id="btnLaunchCollectorChecklist" style="background:#0d6efd; border-color:#0d6efd; width:100%; margin-bottom:15px; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+        🔌 Abrir Coletor Desktop (Hi-Pot)
+      </button>
 
       <!-- OPERADOR -->
       <div style="margin-bottom: 12px;">
@@ -981,6 +986,8 @@
     const aterramentoInput = document.getElementById('continuidadeAterramento');
     const resultButtons = document.querySelectorAll('#hipotModal .btn-result');
     const btnLaunchCollector = document.getElementById('btnLaunchCollector');
+    const checklistSerialInput = document.getElementById('checklistSerialInput');
+    const btnLaunchCollectorChecklist = document.getElementById('btnLaunchCollectorChecklist');
 
     let selectedResult = null;
     let lastData = null;
@@ -1041,6 +1048,12 @@
       return parseSinceToMs(s);
     }
 
+    function getActiveOperator() {
+      const loggedInUser = "{{ current_user.username if (current_user and current_user.is_authenticated) else '' }}";
+      const lastOperator = localStorage.getItem('gp.hipot.operador') || '';
+      return (window.OPERADOR || loggedInUser || lastOperator || 'sistema').trim();
+    }
+
     // --- LISTENER DE SCANNER ---
     (function ScannerWithoutFocus() {
       let buffer = '';
@@ -1054,13 +1067,13 @@
         const upper = raw.toUpperCase();
         let payload;
         if (upper.startsWith('B') || upper.startsWith('SEP') || raw.includes('-') || raw.includes(':')) {
-          payload = { raw_scan: raw, operador: (window.OPERADOR || '').trim() };
+          payload = { raw_scan: raw, operador: getActiveOperator() };
         } else {
           payload = {
             serial: raw,
             bench_id: (scanBench?.value || 'sep'),
             action: (scanAction?.value || 'start'),
-            operador: (window.OPERADOR || '').trim()
+            operador: getActiveOperator()
           };
         }
         postScan(payload);
@@ -1766,6 +1779,47 @@ function liberarChecklistItem(index) {
       });
     }
 
+    if (btnLaunchCollectorChecklist) {
+      btnLaunchCollectorChecklist.addEventListener('click', async () => {
+        const serial = checklistSerialInput ? checklistSerialInput.value : '';
+        if (!serial) {
+          showToast('Atenção', 'Número de Série não selecionado.', 'warn', 3000);
+          return;
+        }
+
+        btnLaunchCollectorChecklist.disabled = true;
+        btnLaunchCollectorChecklist.textContent = '🔌 Abrindo coletor...';
+
+        try {
+          const r = await fetch('/producao/gp/hipot/api/launch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ serial: serial })
+          });
+
+          if (!r.ok) {
+            window.location.href = `hipot://${serial}`;
+            showToast('Aviso', 'SGP em Container/Remoto: Abrindo coletor via protocolo local "hipot://".', 'warn', 7000);
+            return;
+          }
+
+          const d = await r.json();
+          if (d.ok) {
+            showToast('Sucesso', 'Coletor elétrico iniciado na máquina.', 'success', 4000);
+          } else {
+            window.location.href = `hipot://${serial}`;
+            showToast('Aviso', 'Falha no spawn local: Tentando abrir coletor via protocolo local "hipot://".', 'warn', 7000);
+          }
+        } catch (e) {
+          window.location.href = `hipot://${serial}`;
+          showToast('Aviso', 'Servidor SGP inacessível: Tentando abrir coletor via protocolo local "hipot://".', 'warn', 7000);
+        } finally {
+          btnLaunchCollectorChecklist.disabled = false;
+          btnLaunchCollectorChecklist.textContent = '🔌 Abrir Coletor Desktop (Hi-Pot)';
+        }
+      });
+    }
+
     hipotModalBackdrop.addEventListener('click', (e) => {
       if (e.target === hipotModalBackdrop) closeHipotModal();
     });
@@ -1885,10 +1939,13 @@ function liberarChecklistItem(index) {
         let colItems = col.items || [];
         
         if ((col.id || '') === 'final') {
+          // 1. Ordena pelos mais recém finalizados para pegar os 10 mais recentes
           colItems = colItems.slice().sort((a, b) => getFinishTimestamp(b) - getFinishTimestamp(a));
           if (FINAL_CFG.max_items != null && colItems.length > FINAL_CFG.max_items) {
             colItems = colItems.slice(0, FINAL_CFG.max_items);
           }
+          // 2. Ordena os 10 selecionados de forma crescente (mais antigo no topo - FIFO)
+          colItems.sort((a, b) => getFinishTimestamp(a) - getFinishTimestamp(b));
         }
 
         colItems.forEach(it => {
@@ -2142,7 +2199,7 @@ function liberarChecklistItem(index) {
       const upper = raw.toUpperCase();
       
       if (upper.startsWith('B') || upper.startsWith('SEP') || raw.includes('-') || raw.includes(':')) {
-        payload = { raw_scan: raw, operador: (window.OPERADOR || '').trim() };
+        payload = { raw_scan: raw, operador: getActiveOperator() };
       } 
       
       else {
@@ -2150,7 +2207,7 @@ function liberarChecklistItem(index) {
           serial: raw,
           bench_id: scanBench?.value || 'sep',
           action: scanAction?.value || 'start',
-          operador: (window.OPERADOR || '').trim()
+          operador: getActiveOperator()
         };
       }
 

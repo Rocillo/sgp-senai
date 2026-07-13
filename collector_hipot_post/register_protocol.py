@@ -5,6 +5,11 @@ import winreg
 def register_protocol():
     # Caminho do executável do python e do script
     python_path = sys.executable
+    if python_path.endswith("python.exe"):
+        pythonw_path = python_path.replace("python.exe", "pythonw.exe")
+        if os.path.exists(pythonw_path):
+            python_path = pythonw_path
+            
     script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "collector.py"))
     
     # Comando a ser executado pelo Windows

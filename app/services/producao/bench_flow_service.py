@@ -244,7 +244,7 @@ def next_bench_for_order(order: GPWorkOrder) -> str:
 # [NOME] set_current_bench_on_scan
 # [RESPONSABILIDADE] Realinhar bancada no scan, atualizar current_bench e abrir etapa em andamento quando aplicável
 # ====================================================================
-def set_current_bench_on_scan(session, serial: str, bench_id: str) -> Dict[str, str]:
+def set_current_bench_on_scan(session, serial: str, bench_id: str, operador: Optional[str] = None) -> Dict[str, str]:
     """
     Chamado quando o usuario scaneia uma bancada especifica.
     Se a bancada nao estiver no roteiro, realinha para a primeira valida.
@@ -274,7 +274,7 @@ def set_current_bench_on_scan(session, serial: str, bench_id: str) -> Dict[str, 
         )
         if not stg:
             stg = GPWorkStage(
-                order_id=order.id, bench_id=bench_id, started_at=datetime.utcnow()
+                order_id=order.id, bench_id=bench_id, started_at=datetime.utcnow(), operador=operador
             )
             session.add(stg)
 

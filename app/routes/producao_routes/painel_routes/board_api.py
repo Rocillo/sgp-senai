@@ -169,13 +169,16 @@ def board_data():
         if col_id == "sep":
             since_iso = None
         elif col_id == "final":
-            last = (
-                GPWorkStage.query.filter_by(order_id=o.id)
-                .order_by(GPWorkStage.finished_at.desc())
-                .first()
-            )
-            if last and last.finished_at:
-                dt = last.finished_at
+            dt = o.finished_at
+            if not dt:
+                last = (
+                    GPWorkStage.query.filter_by(order_id=o.id)
+                    .order_by(GPWorkStage.finished_at.desc())
+                    .first()
+                )
+                if last:
+                    dt = last.finished_at
+            if dt:
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=timezone.utc)
                 since_iso = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -240,13 +243,17 @@ def board_data():
                     item["rework_flag"] = bool(getattr(st_open, "rework_flag", False))
                     item["workstation"] = getattr(st_open, "workstation", None)
             elif col_id == "final":
-                last_stage = (
-                    GPWorkStage.query.filter_by(order_id=o.id)
-                    .order_by(GPWorkStage.finished_at.desc())
-                    .first()
-                )
-                if last_stage and last_stage.finished_at:
-                    item["finished_at"] = last_stage.finished_at.isoformat()
+                dt = o.finished_at
+                if not dt:
+                    last_stage = (
+                        GPWorkStage.query.filter_by(order_id=o.id)
+                        .order_by(GPWorkStage.finished_at.desc())
+                        .first()
+                    )
+                    if last_stage:
+                        dt = last_stage.finished_at
+                if dt:
+                    item["finished_at"] = dt.isoformat()
         except Exception:
             pass
 

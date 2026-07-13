@@ -1,0 +1,6 @@
+python_interpreter_path = "c:\\Pneumark_Sebraetec\\sgp-senai\\.venv\\Scripts\\python.exe"
+site_package_path = "c:\\Pneumark_Sebraetec\\sgp-senai\\.venv\\Lib\\site-packages"
+search_paths = [
+    ".",
+    "collector_hipot_post"
+]

@@ -13,6 +13,13 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
 )
+import os
+import sys
+
+# Garante que o diretório do script esteja no sys.path para importações locais
+script_dir = os.path.dirname(os.path.abspath(__file__))
+if script_dir not in sys.path:
+    sys.path.insert(0, script_dir)
 
 from reports import RelatorioWindow
 from operators import OPERADORES
@@ -80,19 +87,19 @@ class HipotWindow(QWidget):
         status_box = QVBoxLayout()
 
         self.conn_label = QLabel("🟡 Comunicação: aguardando inicialização...")
-        self.conn_label.setAlignment(Qt.AlignLeft)
+        self.conn_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.conn_label.setStyleSheet(
             "font-size: 16px; font-weight: bold; color: #B58105;"
         )
 
         self.status_label = QLabel("🟡 Aguardando início do teste...")
-        self.status_label.setAlignment(Qt.AlignLeft)
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.status_label.setStyleSheet(
             "font-size: 18px; font-weight: bold; color: #333;"
         )
 
         self.sync_label = QLabel("🟡 Ingestão SGP: aguardando...")
-        self.sync_label.setAlignment(Qt.AlignLeft)
+        self.sync_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.sync_label.setStyleSheet(
             "font-size: 14px; font-weight: bold; color: #B58105;"
         )

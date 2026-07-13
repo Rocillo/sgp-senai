@@ -272,19 +272,34 @@ def _parse_relatorio_hipot(relatorio: str):
 # [RESPONSABILIDADE] Parser robusto de data/hora suportando ISO e formato brasileiro
 # ====================================================================
 def _parse_datetime(dt_str):
+    from zoneinfo import ZoneInfo
+    tz_local = ZoneInfo("America/Sao_Paulo")
+    tz_utc = ZoneInfo("UTC")
+
     if not dt_str:
         return datetime.utcnow()
+    
+    dt = None
     # Tenta formato ISO
     try:
-        return datetime.fromisoformat(dt_str)
+        dt = datetime.fromisoformat(dt_str)
     except ValueError:
         pass
     # Tenta formato brasileiro (utilizado no hipot.db local do desktop)
-    try:
-        return datetime.strptime(dt_str, "%d/%m/%Y %H:%M:%S")
-    except ValueError:
-        pass
-    return datetime.utcnow()
+    if not dt:
+        try:
+            dt = datetime.strptime(dt_str, "%d/%m/%Y %H:%M:%S")
+        except ValueError:
+            pass
+            
+    if not dt:
+        return datetime.utcnow()
+        
+    # Se for naive, assume que vem no fuso local (America/Sao_Paulo) e converte para UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=tz_local)
+        
+    return dt.astimezone(tz_utc).replace(tzinfo=None)
 
 
 # ====================================================================
@@ -346,6 +361,18 @@ def hipot_result_apply():
     hp_ok = final_ok
 
     operador = data.get("operador")
+    if not operador and serial:
+        try:
+            order = GPWorkOrder.query.filter_by(serial=serial).first()
+            if order:
+                stage_b5 = GPWorkStage.query.filter_by(
+                    order_id=order.id, bench_id="b5", finished_at=None
+                ).first()
+                if stage_b5 and stage_b5.operador:
+                    operador = stage_b5.operador
+        except Exception:
+            pass
+
     porta_com = data.get("porta_com")
     baudrate = data.get("baudrate")
 
@@ -362,6 +389,7 @@ def hipot_result_apply():
         serial=serial,
         modelo=parsed_modelo,
         operador=operador,
+        responsavel=operador,
         obs=obs,
         started_at=started_at,
         finished_at=started_at,
@@ -487,13 +515,30 @@ def hipot_manual_submit(serial: str):
     gb_ok = final_ok
     hp_ok = final_ok
 
+    # Tenta obter o operador a partir da etapa B5 ativa ou da ordem de serviço
+    operador = None
+    modelo = None
+    ordem_id = None
+    try:
+        order = GPWorkOrder.query.filter_by(serial=serial).first()
+        if order:
+            modelo = order.modelo
+            ordem_id = order.id
+            stage_b5 = GPWorkStage.query.filter_by(
+                order_id=order.id, bench_id="b5", finished_at=None
+            ).first()
+            if stage_b5:
+                operador = stage_b5.operador
+    except Exception:
+        pass
+
     # Cria novo registro GPHipotRun com as medições mínimas necessárias
     run = GPHipotRun(
         serial=serial,
-        modelo=None,
-        operador=None,
-        responsavel=None,
-        ordem=None,
+        modelo=modelo,
+        operador=operador,
+        responsavel=operador,
+        ordem=str(ordem_id) if ordem_id else None,
         obs=None,
         gb_ok=gb_ok,
         gb_r_mohm=valor,
@@ -610,6 +655,7 @@ def hipot_painel_submit():
     status = "APR" if final_ok else "REP"
 
     # Cria o registro GPHipotRun (Log de rastreabilidade)
+    now = datetime.utcnow()
     run = GPHipotRun(
         serial=serial,
         operador=operador_id or None,
@@ -628,6 +674,8 @@ def hipot_painel_submit():
         gb_t_s=None,
         hp_ileak_ma=None,
         hp_t_s=None,
+        started_at=now,
+        finished_at=now,
     )
     run.finalize()  # Garante que run.final_ok esteja correto
     db.session.add(run)

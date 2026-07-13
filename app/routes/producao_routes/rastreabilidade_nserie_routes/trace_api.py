@@ -23,16 +23,19 @@ trace_api_bp = Blueprint("trace_api_bp", __name__, url_prefix="/producao/gp")
 # ====================================================================
 
 
-# ====================================================================
-# [BLOCO] FUNÇÃO
-# [NOME] _iso
-# [RESPONSABILIDADE] Converter datetime em string ISO de forma tolerante a erros e valores nulos
-# ====================================================================
 def _iso(dt):
+    from zoneinfo import ZoneInfo
+    tz_local = ZoneInfo("America/Sao_Paulo")
+    tz_utc = ZoneInfo("UTC")
+    if not dt:
+        return None
     try:
-        return dt.isoformat() if dt else None
+        # Se for naive, assume que está em UTC e converte para local
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=tz_utc)
+        return dt.astimezone(tz_local).isoformat()
     except Exception:
-        return str(dt) if dt else None
+        return str(dt)
 
 
 # ====================================================================
@@ -151,13 +154,18 @@ def get_trace_timeline(serial):
                     "details": {
                         "bench_id": getattr(hipot, "bench_id", None),
                         "operador": getattr(hipot, "operador", None),
+                        "responsavel": getattr(hipot, "responsavel", None) or getattr(hipot, "operador", None),
                         "started_at": _iso(started_at),
                         "finished_at": _iso(finished_at),
-                        "hp_v": getattr(hipot, "hp_v_obs_v", None),
-                        "hp_v_obs_v": getattr(hipot, "hp_v_obs_v", None),
+                        "hp_v": getattr(hipot, "hp_v_obs_v", None) or getattr(hipot, "hp_v", None),
+                        "hp_v_obs_v": getattr(hipot, "hp_v_obs_v", None) or getattr(hipot, "hp_v", None),
                         "hp_t_s": getattr(hipot, "hp_t_s", None),
+                        "hp_ileak_ma": getattr(hipot, "hp_ileak_ma", None),
+                        "gb_r_mohm": getattr(hipot, "gb_r_mohm", None) or getattr(hipot, "gb_r_mohms", None),
+                        "gb_i_a": getattr(hipot, "gb_i_a", None),
+                        "gb_t_s": getattr(hipot, "gb_t_s", None),
                         "final_ok": getattr(hipot, "final_ok", None),
-                        "observacoes": getattr(hipot, "observacoes", None),
+                        "observacoes": getattr(hipot, "obs", None) or getattr(hipot, "observacoes", None),
                     },
                 }
             )
